@@ -1,0 +1,90 @@
+/* Design tokens. Dark is the default. See docs/design.md for what each color means. */
+@layer reset, tokens, base, layout, components, scenes, utilities;
+
+@font-face {
+  font-family: "Mona Sans";
+  src: url("../fonts/mona-sans-latin-wdth.woff2") format("woff2");
+  font-weight: 200 900;
+  font-stretch: 75% 125%;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Newsreader";
+  src: url("../fonts/newsreader-latin-wght.woff2") format("woff2");
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+@layer tokens {
+  :root {
+    color-scheme: dark;
+
+    /* surfaces */
+    --bg: #070a1c;
+    --bg-lift: #0a0e26;
+    --surface: #0e1330;
+    --surface-2: #161c42;
+    --surface-3: #1f2655;
+    --line: rgba(160, 174, 255, 0.14);
+    --line-2: rgba(160, 174, 255, 0.28);
+    --scrim: rgba(7, 10, 28, 0.72);
+
+    /* ink */
+    --ink: #eef1ff;
+    --ink-2: #b4bce3;
+    --ink-3: #8791c4;
+    --ink-faint: #6a74a8;
+
+    /* roles */
+    --accent: #3cc8ff; /* things you can press, focus */
+    --accent-ink: #04121c;
+    --accent-wash: rgba(60, 200, 255, 0.12);
+    --ahead: #35d6a0; /* behind you, things you have */
+    --ahead-wash: rgba(53, 214, 160, 0.14);
+    --context: #9b8cff; /* everyone else */
+    --you: #ffc14d; /* you */
+    --you-ink: #1a1200;
+    --you-wash: rgba(255, 193, 77, 0.14);
+    --alert: #ff9a8a;
+
+    /* chart fills (inside the lightness band for dark surfaces) */
+    --series-1: #1fa97c;
+    --series-2: #8a78ee;
+    --ramp-v1: #d6ceff; --ramp-v2: #bcb1fc; --ramp-v3: #a397f6; --ramp-v4: #8a7ceb;
+    --ramp-v5: #7263d9; --ramp-v6: #5b4bbf; --ramp-v7: #473a98;
+    --ramp-e1: #3fdda8; --ramp-e2: #2dc291; --ramp-e3: #20a07a; --ramp-e4: #167e60;
+    --map-none: #1b2250;
+    --map-line: #070a1c;
+    --grid: rgba(160, 174, 255, 0.1);
+    --axis: rgba(160, 174, 255, 0.24);
+
+    /* type */
+    --font-ui: "Mona Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-read: "Newsreader", "Iowan Old Style", Georgia, "Times New Roman", serif;
+    --t-xs: clamp(0.75rem, 0.73rem + 0.1vw, 0.8125rem);
+    --t-sm: clamp(0.8125rem, 0.79rem + 0.12vw, 0.9rem);
+    --t-base: 1rem;
+    --t-read: clamp(1.0625rem, 1rem + 0.35vw, 1.25rem);
+    --t-lg: clamp(1.2rem, 1.1rem + 0.5vw, 1.5rem);
+    --t-xl: clamp(1.5rem, 1.2rem + 1.5vw, 2.25rem);
+    --t-2xl: clamp(2rem, 1.4rem + 3vw, 3.5rem);
+    --t-3xl: clamp(2.6rem, 1.6rem + 5vw, 5.25rem);
+    --t-hero: clamp(4.5rem, 2.2rem + 14vw, 13rem);
+
+    /* space and shape */
+    --gutter: clamp(1rem, 4vw, 2.5rem);
+    --page: 1240px;
+    --measure: 62ch;
+    --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem;
+    --space-5: 1.5rem; --space-6: 2rem; --space-7: 3rem; --space-8: 4.5rem; --space-9: 7rem;
+    --section: clamp(4rem, 8vw, 8rem);
+    --r-s: 8px; --r-m: 12px; --r-l: 22px; --r-pill: 999px;
+    --bar-h: 3.5rem;
+
+    /* motion */
+    --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+    --t-fast: 140ms;
+    --t-mid: 260ms;
+    --t-slow: 520ms;
+  }
+}

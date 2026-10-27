@@ -1,0 +1,289 @@
+[
+ {
+  "id": "eu-eea-ch",
+  "name": "EU + EEA + Switzerland free movement of persons",
+  "rights": "full",
+  "members": [
+   "AUT",
+   "BEL",
+   "BGR",
+   "HRV",
+   "CYP",
+   "CZE",
+   "DNK",
+   "EST",
+   "FIN",
+   "FRA",
+   "DEU",
+   "GRC",
+   "HUN",
+   "IRL",
+   "ITA",
+   "LVA",
+   "LTU",
+   "LUX",
+   "MLT",
+   "NLD",
+   "POL",
+   "PRT",
+   "ROU",
+   "SVK",
+   "SVN",
+   "ESP",
+   "SWE",
+   "ISL",
+   "LIE",
+   "NOR",
+   "CHE"
+  ],
+  "who": "Citizens of the 27 EU states, Iceland, Liechtenstein, Norway and Switzerland, in any of the other states.",
+  "basis": "TFEU Arts. 21 and 45 and Directive 2004/38/EC; EEA Agreement (1994); EU-Switzerland Free Movement Agreement (signed 1999, in force 2002). Treaty years for EEA and Switzerland are from memory (UNVERIFIED).",
+  "url": "https://europa.eu/youreurope/citizens/residence/residence-rights/index_en.htm",
+  "verified": true,
+  "note": "Full for workers and the self-employed. Registration is needed after 3 months. Non-workers must have means. UK citizens are no longer covered (Brexit). Andorra, Monaco, San Marino and the Vatican are not covered. Switzerland: voters rejected the SVP '10 million' initiative on 14 June 2026 (54.79 percent no, press reports in search results, UNVERIFIED), so the free movement agreement stays; Bilaterals III is still pending. Liechtenstein limits new residence permits under its own EEA deal (UNVERIFIED)."
+ },
+ {
+  "id": "mercosur-residence",
+  "name": "Mercosur Residence Agreement",
+  "rights": "partial",
+  "members": [
+   "ARG",
+   "BOL",
+   "BRA",
+   "CHL",
+   "COL",
+   "ECU",
+   "PRY",
+   "PER",
+   "URY"
+  ],
+  "who": "Nationals of the parties, in any other party. Apply for temporary residence (up to 2 years), then permanent residence. Documents only: passport or ID, birth certificate, criminal record certificate.",
+  "basis": "Acuerdo sobre Residencia para Nacionales de los Estados Partes del MERCOSUR, Bolivia y Chile, signed in Brasilia on 6 December 2002 (Art. 1 residence, Art. 9 right to work).",
+  "url": "https://www.argentina.gob.ar/normativa/nacional/norma-96649/texto",
+  "verified": true,
+  "note": "Partial because a residence permit must be applied for. Colombia, Ecuador and Peru joined later (UNVERIFIED in a primary source). Venezuela is suspended; Guyana and Suriname are not on the list (UNVERIFIED). National tightening in 2025-26 was not checked."
+ },
+ {
+  "id": "nordic",
+  "name": "Nordic Passport Union and common labour market",
+  "rights": "full",
+  "members": [
+   "DNK",
+   "FIN",
+   "ISL",
+   "NOR",
+   "SWE"
+  ],
+  "who": "Citizens of the five Nordic states (and Faroe Islands, Greenland) in each other's territory, with no residence or work permit.",
+  "basis": "Common Nordic labour market (1 July 1954); Nordic Passport Union (treaty of 12 July 1957, in force 1 May 1958, Iceland 1965-66); Helsinki Treaty (1962, year from memory).",
+  "url": "https://en.wikipedia.org/wiki/Nordic_Passport_Union",
+  "verified": false,
+  "note": "All five states are also in the EEA, so this regime adds rights only for the Faroe Islands and Greenland. Registration in the population register is needed for longer stays (UNVERIFIED)."
+ },
+ {
+  "id": "cta-uk-ie",
+  "name": "Common Travel Area (UK and Ireland)",
+  "rights": "full",
+  "members": [
+   "GBR",
+   "IRL"
+  ],
+  "who": "British and Irish citizens, in each other's country and the Crown Dependencies. Family members who are not British or Irish citizens are not covered.",
+  "basis": "Long-standing arrangement that pre-dates EU membership; reaffirmed in the UK-Ireland Memorandum of Understanding of May 2019.",
+  "url": "https://www.gov.uk/government/publications/common-travel-area-guidance/common-travel-area-guidance",
+  "verified": true,
+  "note": "Quote: 'move freely and reside in either jurisdiction'. Irish citizens do not need a UK ETA (gov.uk ETA page lists British or Irish passport as exempt)."
+ },
+ {
+  "id": "trans-tasman",
+  "name": "Trans-Tasman Travel Arrangement (Australia and New Zealand)",
+  "rights": "full",
+  "members": [
+   "AUS",
+   "NZL"
+  ],
+  "who": "Australian and New Zealand citizens (and some permanent residents), in the other country. NZ citizens get an Australian Special Category visa (subclass 444) on arrival.",
+  "basis": "Trans-Tasman Travel Arrangement (1973).",
+  "url": "https://en.wikipedia.org/wiki/Trans-Tasman_Travel_Arrangement",
+  "verified": false,
+  "note": "Subclass 444 details, limited welfare access for NZ citizens and the 2023 Australian citizenship pathway are from memory (UNVERIFIED)."
+ },
+ {
+  "id": "nz-realm",
+  "name": "New Zealand citizenship of Cook Islands, Niue and Tokelau",
+  "rights": "full",
+  "members": [
+   "NZL",
+   "COK",
+   "NIU",
+   "TKL"
+  ],
+  "who": "Cook Islanders, Niueans and Tokelauans are mostly New Zealand citizens, so they hold NZ passports and can live and work in New Zealand and, via Trans-Tasman rules, Australia.",
+  "basis": "British Nationality and New Zealand Citizenship Act 1948 (Cook Islands; per Wikipedia). Niue and Tokelau: UNVERIFIED.",
+  "url": "https://en.wikipedia.org/wiki/Cook_Islands",
+  "verified": false,
+  "note": "Wikipedia: 'Most Cook Islanders have New Zealand citizenship'. Passport Index lists no row for COK, NIU or TKL."
+ },
+ {
+  "id": "gcc",
+  "name": "GCC common market (right to work in other Gulf states)",
+  "rights": "partial",
+  "members": [
+   "BHR",
+   "KWT",
+   "OMN",
+   "QAT",
+   "SAU",
+   "ARE"
+  ],
+  "who": "GCC citizens. Equal treatment to work in government and private sectors in all six states. Entry on a national ID card.",
+  "basis": "GCC common market launched 1 January 2008 and extended in January 2015 (Wikipedia). The 2001 GCC Economic Agreement is from memory (UNVERIFIED).",
+  "url": "https://en.wikipedia.org/wiki/Gulf_Cooperation_Council",
+  "verified": false,
+  "note": "Rights are broader on paper than in practice. Residence and work still go through national procedures (UNVERIFIED)."
+ },
+ {
+  "id": "ecowas",
+  "name": "ECOWAS Protocol on Free Movement of Persons, Residence and Establishment",
+  "rights": "partial",
+  "members": [
+   "BEN",
+   "CPV",
+   "CIV",
+   "GMB",
+   "GHA",
+   "GIN",
+   "GNB",
+   "LBR",
+   "NGA",
+   "SEN",
+   "SLE",
+   "TGO"
+  ],
+  "who": "Citizens of the 12 current ECOWAS states. Visa-free entry (phase 1). Residence and establishment (phases 2 and 3) are only partly applied.",
+  "basis": "ECOWAS Protocol A/P.1/5/79 on Free Movement of Persons, Residence and Establishment (May 1979).",
+  "url": "https://en.wikipedia.org/wiki/ECOWAS",
+  "verified": false,
+  "note": "Mali, Burkina Faso and Niger left on 29 January 2025 (Wikipedia). Press reports say ECOWAS kept honouring free movement for their citizens until further notice (UNVERIFIED snippets). On 19 October 2026 MyJoyOnline reported a Dakar ministers' meeting where ECOWAS and the AES agreed to build a cooperation framework that aims to largely keep visa-free movement. Terms are not final.",
+  "interim": [
+   "MLI",
+   "BFA",
+   "NER"
+  ]
+ },
+ {
+  "id": "caricom-csme",
+  "name": "CARICOM Single Market and Economy (skilled-worker free movement)",
+  "rights": "partial",
+  "members": [
+   "ATG",
+   "BRB",
+   "BLZ",
+   "DMA",
+   "GRD",
+   "GUY",
+   "JAM",
+   "KNA",
+   "LCA",
+   "VCT",
+   "SUR",
+   "TTO"
+  ],
+  "who": "Nationals in listed skilled categories (graduates, media, sports, arts, music and more) who hold a CARICOM Skills Certificate, which replaces a work permit.",
+  "basis": "Revised Treaty of Chaguaramas (2001, from memory), CSM in effect 1 January 2006 (Wikipedia).",
+  "url": "https://en.wikipedia.org/wiki/CARICOM_Single_Market_and_Economy",
+  "verified": false,
+  "note": "Haiti is only a partial participant. The Bahamas is not in the CSME (UNVERIFIED). Montserrat is a territory."
+ },
+ {
+  "id": "caricom-full-2025",
+  "name": "CARICOM full free movement (four states, from 1 October 2025)",
+  "rights": "full",
+  "members": [
+   "BRB",
+   "BLZ",
+   "DMA",
+   "VCT"
+  ],
+  "who": "Nationals of these four states can enter, reside, work and stay indefinitely in the others with no work or residency permit.",
+  "basis": "CARICOM Heads of Government decision to allow full free movement for willing members; effective 1 October 2025.",
+  "url": "https://caricom.org/?p=47868",
+  "verified": true,
+  "note": "Official CARICOM item: nationals of these four states can move, reside, work and stay indefinitely in each other's states with no work or residency permit. Other states may join later. Whether more states joined by October 2026 was not checked."
+ },
+ {
+  "id": "eac",
+  "name": "East African Community Common Market Protocol",
+  "rights": "partial",
+  "members": [
+   "BDI",
+   "COD",
+   "KEN",
+   "RWA",
+   "SSD",
+   "TZA",
+   "UGA",
+   "SOM"
+  ],
+  "who": "Citizens of EAC partner states. Visa-free entry, right to work under host rules, rights of residence and establishment.",
+  "basis": "EAC Common Market Protocol, signed and in force 2010 (eac.int).",
+  "url": "https://www.eac.int/common-market",
+  "verified": true,
+  "note": "eac.int says the right is not absolute and that the 2015 target for fully opening the services schedule was not met. Public service jobs are excluded unless host law allows. Whether the Protocol applies fully to DR Congo, South Sudan and Somalia is UNVERIFIED."
+ },
+ {
+  "id": "eaeu",
+  "name": "Eurasian Economic Union (labour without work permit)",
+  "rights": "full",
+  "members": [
+   "ARM",
+   "BLR",
+   "KAZ",
+   "KGZ",
+   "RUS"
+  ],
+  "who": "Citizens of the five member states can work in any other member state without a work permit.",
+  "basis": "Treaty on the Eurasian Economic Union (signed 29 May 2014, in force 1 January 2015; dates from memory, UNVERIFIED).",
+  "url": "https://en.wikipedia.org/wiki/Eurasian_Economic_Union",
+  "verified": false,
+  "note": "Wikipedia: free movement of 'labour without a work permit'. Russia and Belarus also have the Union State, which gives equal rights including the right to work and settle. Registration rules were not checked."
+ },
+ {
+  "id": "cofa-us",
+  "name": "US Compacts of Free Association",
+  "rights": "full",
+  "members": [
+   "FSM",
+   "MHL",
+   "PLW",
+   "USA"
+  ],
+  "who": "Citizens of the Federated States of Micronesia, the Marshall Islands and Palau can enter, work and live in the United States as non-immigrants, with no visa.",
+  "basis": "Compact of Free Association Sec. 141(a) (FSM and RMI: Pub. L. 99-239, 1986; amended Pub. L. 108-188, 2003; Palau: Pub. L. 99-658, in effect 1994; renewed 2024, Pub. L. 118-42 per Wikipedia).",
+  "url": "http://www.fsmlaw.org/compact/t01art04.htm",
+  "verified": true,
+  "note": "Quote: 'may enter into, lawfully engage in occupations, and establish residence as a non-immigrant'. Sec. 141(c) says this gives no right to the residence needed for naturalization.",
+  "from": [
+   "FSM",
+   "MHL",
+   "PLW"
+  ],
+  "to": [
+   "USA"
+  ]
+ },
+ {
+  "id": "india-nepal",
+  "name": "India-Nepal open border and 1950 Treaty",
+  "rights": "full",
+  "members": [
+   "IND",
+   "NPL"
+  ],
+  "who": "Indian and Nepali citizens can live and work in each other's country without a visa or work permit.",
+  "basis": "Treaty of Peace and Friendship between India and Nepal, 31 July 1950, Art. 7 (article text from memory, UNVERIFIED).",
+  "url": "https://en.wikipedia.org/wiki/India%E2%80%93Nepal_relations",
+  "verified": false,
+  "note": "Wikipedia: 'may live and work in either country'. Some government jobs are closed to foreigners (UNVERIFIED). India-Bhutan has a similar but not equal arrangement (not checked, not included)."
+ }
+]

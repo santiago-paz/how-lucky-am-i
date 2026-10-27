@@ -1,0 +1,50 @@
+{
+  "about": "Net worth per adult in US dollars at market exchange rates, end of 2025. Transcribed from UBS, Global Wealth Report 2026 (published 30 June 2026), page 14, 'Wealth per adult: the top 30'. The report prints two separate top-30 lists, so some countries have only a mean or only a median. UBS does not publish a country table for the rest of the world in this edition, so other countries are estimated in scripts/build-data.mjs.",
+  "source": "https://www.ubs.com/content/dam/assets/wm/static/gwr/global-wealth-report-en-2026.pdf",
+  "year": 2025,
+  "pyramid": {
+    "about": "UBS global wealth pyramid, end of 2025, page 23. It covers a sample of 56 markets with about 3.85 billion adults, not the whole world.",
+    "adults": { "below10k": 1620000000, "b10to100k": 1580000000, "b100kto1m": 588000000, "above1m": 58000000 },
+    "share": { "below10k": 0.421, "b10to100k": 0.411, "b100kto1m": 0.153, "above1m": 0.015 }
+  },
+  "countries": {
+    "CHE": { "mean": 910382, "median": 145555 },
+    "USA": { "mean": 696277, "median": 68998 },
+    "LUX": { "mean": 654732, "median": 394005 },
+    "HKG": { "mean": 648267, "median": 187968 },
+    "AUS": { "mean": 616306, "median": 210783 },
+    "SGP": { "mean": 527217, "median": 96434 },
+    "DNK": { "mean": 523344, "median": 203771 },
+    "NZL": { "mean": 449852, "median": 206617 },
+    "NOR": { "mean": 425391, "median": 140003 },
+    "NLD": { "mean": 415287, "median": 127407 },
+    "BEL": { "mean": 407920, "median": 277166 },
+    "SWE": { "mean": 406406, "median": 84039 },
+    "CAN": { "mean": 399886, "median": 147811 },
+    "DEU": { "mean": 346613, "median": 53485 },
+    "FRA": { "mean": 341359, "median": 121898 },
+    "TWN": { "mean": 332533, "median": 113137 },
+    "IRL": { "mean": 314167, "median": 98413 },
+    "ISR": { "mean": 312108, "median": 83843 },
+    "KOR": { "mean": 311260, "median": 101739 },
+    "ESP": { "mean": 306412, "median": 111575 },
+    "GBR": { "mean": 292808, "median": 125335 },
+    "AUT": { "mean": 279989, "median": 71378 },
+    "ITA": { "mean": 279439, "median": 131001 },
+    "JPN": { "mean": 211846, "median": 135745 },
+    "FIN": { "mean": 209135, "median": 89695 },
+    "PRT": { "mean": 195761, "median": 76978 },
+    "QAT": { "mean": 188505, "median": 95499 },
+    "MLT": { "mean": 163655, "median": 114033 },
+    "ARE": { "mean": 157612, "median": null },
+    "GRC": { "mean": 143343, "median": 59162 },
+    "SVN": { "mean": null, "median": 81366 }
+  },
+  "older": {
+    "about": "End-2022 values from the UBS Global Wealth Databook 2023, as shown on Wikipedia 'List of countries by wealth per adult' (a secondary copy). Used only as low-income anchor points for the fit, never shown as UBS 2025 numbers.",
+    "ARG": { "mean": 13323, "median": 4354 },
+    "BRA": { "mean": 29452, "median": 5702 },
+    "IND": { "mean": 16500, "median": 3755 },
+    "NGA": { "mean": 6879, "median": 1507 }
+  }
+}

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>How Lucky I Am</title>
+  <meta name="description" content="Answer a few questions and see where you stand among the 8.2 billion people alive, using public data from the World Bank, the UN and others. Your answers never leave your browser.">
+  <meta name="theme-color" content="#070a1c">
+  <meta name="color-scheme" content="dark">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="How Lucky I Am">
+  <meta property="og:description" content="Where do you stand among 8.2 billion people? Find your place, using public data.">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23070a1c'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23ffc14d'/%3E%3Ccircle cx='16' cy='16' r='10' fill='none' stroke='%23ffc14d' stroke-opacity='.35'/%3E%3C/svg%3E">
+  <link rel="preload" href="assets/fonts/mona-sans-latin-wdth.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="assets/fonts/newsreader-latin-wght.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="assets/css/tokens.css">
+  <link rel="stylesheet" href="assets/css/base.css">
+  <link rel="stylesheet" href="assets/css/components.css">
+  <link rel="stylesheet" href="assets/css/scenes.css">
+  <link rel="stylesheet" href="assets/css/results.css">
+</head>
+<body data-view="intro">
+  <a class="skip-link" href="#main" data-i18n="skip">Skip to the content</a>
+
+  <header class="site-bar">
+    <a class="wordmark" href="./" aria-label="How Lucky I Am" translate="no">How Lucky <span class="i">I</span> Am</a>
+    <div class="bar-tools">
+      <button type="button" class="btn btn-quiet" id="motion" aria-pressed="false" data-i18n-attr="aria-label:bar.motion">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 5v14M15.5 5v14"/></svg>
+        <span data-i18n="bar.motion">Pause motion</span>
+      </button>
+      <button type="button" class="btn btn-quiet" id="restart" hidden data-i18n-attr="aria-label:bar.restart">
+        <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+        <span data-i18n="bar.restart">Start over</span>
+      </button>
+      <div class="seg" role="group" data-i18n-attr="aria-label:lang.label" aria-label="Language">
+        <button type="button" data-lang="en" aria-pressed="true" lang="en">EN</button>
+        <button type="button" data-lang="es" aria-pressed="false" lang="es">ES</button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" tabindex="-1">
+    <section id="intro" class="intro" aria-labelledby="intro-title">
+      <div class="intro-field"><canvas id="hero-canvas" aria-hidden="true"></canvas></div>
+      <div class="intro-copy">
+        <h1 id="intro-title"></h1>
+        <p class="read lede" data-i18n="intro.lede"></p>
+        <div class="intro-actions">
+          <button type="button" class="btn btn-primary btn-lg" id="start" data-i18n="intro.start"></button>
+          <a class="btn btn-quiet" href="#method" data-i18n="intro.how"></a>
+        </div>
+        <p class="small" data-i18n="intro.fine"></p>
+      </div>
+      <p class="intro-caption small" data-i18n="intro.caption"></p>
+    </section>
+
+    <section id="wizard" class="wizard" aria-label="Questions" hidden></section>
+
+    <div id="results" hidden></div>
+
+    <div id="method-slot"></div>
+  </main>
+
+  <footer class="site-foot">
+    <div class="wrap" id="foot"></div>
+  </footer>
+
+  <script src="assets/js/data/world.js"></script>
+  <script src="assets/js/data/passports.js"></script>
+  <script src="assets/js/data/map.js"></script>
+  <script src="assets/js/util.js"></script>
+  <script src="assets/js/i18n.js"></script>
+  <script src="assets/js/i18n.en.js"></script>
+  <script src="assets/js/i18n.es.js"></script>
+  <script src="assets/js/i18n.results.en.js"></script>
+  <script src="assets/js/i18n.results.es.js"></script>
+  <script src="assets/js/sources.js"></script>
+  <script src="assets/js/model.js"></script>
+  <script src="assets/js/people.js"></script>
+  <script src="assets/js/field.js"></script>
+  <script src="assets/js/ui.js"></script>
+  <script src="assets/js/state.js"></script>
+  <script src="assets/js/wizard.js"></script>
+  <script src="assets/js/results.js"></script>
+  <script src="assets/js/results2.js"></script>
+  <script src="assets/js/share.js"></script>
+  <script src="assets/js/method.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
