@@ -10,9 +10,11 @@
   const W = 1080, H = 1350;
 
   // The address of the site. The card and the shared text always carry it, wherever the page is opened from
-  // (a test address means nothing to the people who see the card). The same address is written in index.html
-  // (the link preview and the canonical link) and in package.json: change all three together.
-  const SITE = 'https://how-lucky-am-i.vercel.app';
+  // (a test address means nothing to the people who see the card). The bare domain is shown because it is the
+  // one people can remember; it sends them on to the page. The link preview tags in index.html name the address
+  // that serves the page, so they differ by the "www." on purpose. If the domain changes, change SITE, those tags
+  // and "homepage" in package.json together.
+  const SITE = 'https://howluckyami.app';
   const publicOrigin = () => SITE;
   const publicHost = () => SITE.replace(/^https?:\/\//, '');
 

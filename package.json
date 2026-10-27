@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "description": "A static site that places you among the 8 billion people alive, using public data. No framework, no runtime dependencies.",
-  "homepage": "https://how-lucky-am-i.vercel.app",
+  "homepage": "https://howluckyami.app",
   "scripts": {
     "dev": "python3 -m http.server 5173",
     "fetch": "node scripts/fetch-pip.mjs && node scripts/fetch-wdi.mjs && node scripts/fetch-misc.mjs",

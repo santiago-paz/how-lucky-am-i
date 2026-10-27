@@ -4,7 +4,7 @@ A web page that shows where you stand among the 8.3 billion people alive. You an
 
 Where you were born, which passport you hold and who raised you explain more of your income than anything you did later. The page lets you see that with your own numbers.
 
-Try it: https://how-lucky-am-i.vercel.app
+Try it: https://howluckyami.app
 
 ## What you get
 
@@ -63,7 +63,7 @@ npm test             # 15 tests
 
 ## Put it online
 
-The site is plain files, so any static host works. It is live at https://how-lucky-am-i.vercel.app. For Vercel, this repo has a small script. It uploads only `index.html` and `assets/` (not the notes, scripts, tests or raw data).
+The site is plain files, so any static host works. It is live at https://howluckyami.app. For Vercel, this repo has a small script. It uploads only `index.html` and `assets/` (not the notes, scripts, tests or raw data).
 
 ```bash
 vercel link --yes --project how-lucky-am-i   # once, to tie this folder to a Vercel project
@@ -76,7 +76,7 @@ npm run deploy -- --stage-only               # only build .deploy/, to look at w
 
 ## Link preview
 
-When the link is shared (LinkedIn, WhatsApp, Slack, X), the picture comes from `assets/og/og-image.jpg`, 1200 by 630 pixels. It is drawn by `scripts/og-card.html` from the same map of people the site uses. To make it again: run `npm run dev`, open http://localhost:5173/scripts/og-card.html in a 1200 by 630 window at a device pixel ratio of 2, save a screenshot, and shrink it to 1200 by 630 as a JPEG (`ffmpeg -i shot.png -vf scale=1200:630 -q:v 2 assets/og/og-image.jpg`). The full web addresses in the `og:` tags and the canonical link of `index.html` must match the site's address. The same address is written in `SITE` in `assets/js/share.js` (the share card and the shared text carry it) and in `homepage` in `package.json`. LinkedIn keeps a copy of each link for a while: to see a change at once, paste the link into https://www.linkedin.com/post-inspector/.
+When the link is shared (LinkedIn, WhatsApp, Slack, X), the picture comes from `assets/og/og-image.jpg`, 1200 by 630 pixels. It is drawn by `scripts/og-card.html` from the same map of people the site uses. To make it again: run `npm run dev`, open http://localhost:5173/scripts/og-card.html in a 1200 by 630 window at a device pixel ratio of 2, save a screenshot, and shrink it to 1200 by 630 as a JPEG (`ffmpeg -i shot.png -vf scale=1200:630 -q:v 2 assets/og/og-image.jpg`). The full web addresses in the `og:` tags and the canonical link of `index.html` must be the address that serves the page. Today that is `www.howluckyami.app`, because the bare domain `howluckyami.app` sends visitors on to it. The share card and the shared text carry the bare domain (`SITE` in `assets/js/share.js`), and `homepage` in `package.json` has it too. LinkedIn keeps a copy of each link for a while: to see a change at once, paste the link into https://www.linkedin.com/post-inspector/.
 
 ## Project layout
 
