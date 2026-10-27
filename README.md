@@ -4,6 +4,8 @@ A web page that shows where you stand among the 8.3 billion people alive. You an
 
 Where you were born, which passport you hold and who raised you explain more of your income than anything you did later. The page lets you see that with your own numbers.
 
+Try it: https://how-lucky-am-i.vercel.app
+
 ## What you get
 
 - An intro that draws every person alive as a dot on a world map. One dot is about one million people.
@@ -61,7 +63,7 @@ npm test             # 15 tests
 
 ## Put it online
 
-The site is plain files, so any static host works. For Vercel, this repo has a small script. It uploads only `index.html` and `assets/` (not the notes, scripts, tests or raw data).
+The site is plain files, so any static host works. It is live at https://how-lucky-am-i.vercel.app. For Vercel, this repo has a small script. It uploads only `index.html` and `assets/` (not the notes, scripts, tests or raw data).
 
 ```bash
 vercel link --yes --project how-lucky-am-i   # once, to tie this folder to a Vercel project
