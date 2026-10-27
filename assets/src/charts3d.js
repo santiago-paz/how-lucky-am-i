@@ -447,7 +447,7 @@ export class Pyramid3D extends Stage3D {
 // Eight towers in a row, as tall as the share of people you are ahead of. Behind them a wall with a scale: half, and
 // everyone. A violet ring on each tower marks the typical person in your country. A gold line across the wall marks
 // your place overall, so you can see which areas lift you and which hold you back.
-const TW = { HMAX: 3.4, W: 0.7, SP: 1.3, YAW: 0, PITCH: 0.33, WALLZ: -1.15, PAD_L: 2.3, PAD_R: 2.7 };
+const TW = { HMAX: 3.4, W: 0.7, SP: 1.3, YAW: 0, PITCH: 0.33, WALLZ: -1.15, PAD_L: 3.1, PAD_R: 2.7 };
 
 export class Towers3D extends Stage3D {
   // o: { areas: [{ id, value 0..1, typical 0..1, text, name, icon (an svg node) }], overall: { value, text, name },
@@ -559,7 +559,7 @@ export class Towers3D extends Stage3D {
     this.towers.forEach((T) => { T.x = T.x0 * k; T.g.position.x = T.x; T.valW = 0; T.nameW = 0; }); // the label sizes are measured again on the next frame
     this.wallG.scale.x = k;
     const lower = this.narrow ? 0.4 : 0; // the key takes a row at the top of a narrow frame: the scene sits a little lower
-    const room = this.narrow ? 1.7 : 0.8; // room under the towers for a second line of names (and, on a narrow frame, of values)
+    const room = this.narrow ? 1.7 : 1.2; // room under the towers for a second row of names (and, on a narrow frame, of values)
     this.target.set(0, TW.HMAX * 0.5 - 0.1 + lower - room / 2, -0.3);
     const extentX = this.narrow ? this.rowW * k + TW.W + 1.4 : (this.wallX[1] - this.wallX[0]) + 0.3;
     this.dist = this.fitDistance(extentX, TW.HMAX + 4.4 + lower * 2 + room, 1.02);

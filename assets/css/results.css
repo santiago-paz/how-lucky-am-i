@@ -306,7 +306,7 @@
   .c3-labels > * { position: absolute; left: 0; top: 0; width: max-content; opacity: 0; will-change: transform; }
   .c3-val { font-weight: 800; font-size: var(--t-sm); color: var(--ink); font-variant-numeric: tabular-nums; padding: 0.08rem 0.5rem; border-radius: var(--r-pill); background: color-mix(in srgb, var(--bg) 72%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent); transition: color var(--t-fast) var(--ease); }
   .c3-val.hot { color: var(--ahead); }
-  .c3-name { display: grid; justify-items: center; gap: 0.2rem; max-width: 5.2rem; text-align: center; font-size: var(--t-xs); font-weight: 650; line-height: 1.2; color: var(--ink-2); }
+  .c3-name { display: grid; justify-items: center; gap: 0.2rem; max-width: 7.6rem; text-align: center; font-size: var(--t-xs); font-weight: 650; line-height: 1.2; color: var(--ink-2); }
   .c3-ico svg { display: block; width: 1.15rem; height: 1.15rem; color: var(--ahead); }
   .c3-nv { display: none; }
   .c3-narrow .c3-nm, .c3-narrow .c3-val { display: none; }
