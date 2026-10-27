@@ -52,39 +52,132 @@
     const home = S.a.residence;
     const live = [...m.live].filter((id) => !m.homes.has(id));
     const lim = [...m.limited];
+    const reduced = () => HLIA.util.reducedMotion();
+    const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
 
-    // ---- 2D map ----
+    // ---- the map ----
     const MAP = HLIA.MAP;
     const vb0 = MAP.vb;
+    const homeAt = MAP.cent[home];
     let view = { x: vb0[0], y: vb0[1], w: vb0[2], h: vb0[3] };
-    const mapSvg = svg('svg', { viewBox: vb0.join(' '), class: 'map', role: 'img', 'aria-label': t('pp.title') });
+    const mapSvg = svg('svg', { viewBox: vb0.join(' '), class: 'map pre', role: 'img', 'aria-label': t('pp.title') });
     const paths = {};
     const g = svg('g', null);
+    // the doors open outward from home: each country waits for the wave to reach it
+    const WAVE = 2200;
+    const reach = (key) => { const c = MAP.cent[key]; return homeAt && c ? Math.hypot(c[0] - homeAt[0], c[1] - homeAt[1]) : 0; };
+    const farthest = Math.max(1, ...model.PIDS.map(reach));
+    const wave = (key) => Math.round((reach(key) / farthest) * WAVE);
     for (const [key, d] of MAP.shapes) {
       const known = info[key];
       const p = svg('path', { d, class: 'cn c-' + (known ? known.cls : 'nodata'), 'data-id': key });
       if (known && known.cls === 'limited') p.classList.add('c-limited');
+      p.style.setProperty('--d', wave(key) + 'ms');
       paths[key] = p; g.appendChild(p);
     }
     mapSvg.appendChild(g);
     // small countries get a dot so they can be seen and touched
-    const small = [];
     for (const id of model.PIDS) {
       const pos = MAP.cent[id];
       if (!pos) continue;
       if (!paths[id]) { // no polygon: draw a dot
         const c = svg('circle', { cx: pos[0], cy: pos[1], r: 1.6, class: 'cn c-' + info[id].cls, 'data-id': id });
-        paths[id] = c; g.appendChild(c); small.push(c);
+        c.style.setProperty('--d', wave(id) + 'ms');
+        paths[id] = c; g.appendChild(c);
       }
     }
+    // above the countries: routes from home, the place you picked, and rings spreading from home
+    const arcsG = svg('g', { class: 'arcs', 'aria-hidden': 'true' });
+    const homeG = svg('g', { class: 'home-rings', 'aria-hidden': 'true' });
+    if (homeAt) [0, 1, 2].forEach((i) => { const c = svg('circle', { cx: homeAt[0], cy: homeAt[1], r: 3, class: 'ripple' }); c.style.animationDelay = i * 1.05 + 's'; homeG.appendChild(c); });
+    mapSvg.append(arcsG, homeG);
+
     const nameOf = (key) => names[key] || (MAP.terr[key] ? (i18n.lang === 'es' ? MAP.terr[key].es : MAP.terr[key].n) : key);
-    const result = el('p', { class: 'pp-result', 'aria-live': 'polite' }, '');
-    let selected = null;
-    function select(id) {
+    const result = el('p', { class: 'pp-result', 'aria-live': 'polite' }, ''); // sits on the map, at the bottom left, and shows only when a place is picked
+
+    // a route is a quadratic curve that bows upward, like a flight path
+    function route(a, b) {
+      const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1;
+      let nx = -dy / len, ny = dx / len;
+      if (ny > 0) { nx = -nx; ny = -ny; }
+      const cx = (a[0] + b[0]) / 2 + nx * len * 0.26, cy = (a[1] + b[1]) / 2 + ny * len * 0.26;
+      let L = 0, px = a[0], py = a[1];
+      for (let k = 1; k <= 16; k++) { const u = k / 16, x = (1 - u) * (1 - u) * a[0] + 2 * u * (1 - u) * cx + u * u * b[0], y = (1 - u) * (1 - u) * a[1] + 2 * u * (1 - u) * cy + u * u * b[1]; L += Math.hypot(x - px, y - py); px = x; py = y; }
+      return { d: `M${a[0].toFixed(1)},${a[1].toFixed(1)}Q${cx.toFixed(1)},${cy.toFixed(1)} ${b[0].toFixed(1)},${b[1].toFixed(1)}`, L };
+    }
+    const routePath = (cls, a, b, delay) => {
+      const { d, L } = route(a, b);
+      const p = svg('path', { d, class: 'arc ' + cls });
+      p.style.setProperty('--L', L.toFixed(1)); p.style.setProperty('--d', delay + 'ms');
+      return p;
+    };
+    // where the routes go: every place you can live and work, and the biggest places you can enter without a visa
+    function routes() {
+      if (!homeAt) return [];
+      const liveIds = [...live, ...lim].filter((id) => MAP.cent[id] && id !== home);
+      const free = model.PIDS.filter((id) => id !== home && info[id] && info[id].cls === 'free' && MAP.cent[id]).sort((a, b) => (model.byId[b].pop || 0) - (model.byId[a].pop || 0)).slice(0, 22);
+      return [...liveIds.map((id) => [id, 'live']), ...free.map((id) => [id, 'free'])]
+        .sort((a, b) => reach(a[0]) - reach(b[0]))
+        .map(([id, cls], i) => routePath(cls, homeAt, MAP.cent[id], 900 + i * 26));
+    }
+    // a bright dash that runs along a route now and then
+    let pulseTimer = 0;
+    function pulse() {
+      const list = arcsG.querySelectorAll('.arc:not(.sel)');
+      if (!list.length) return;
+      const src = list[Math.floor(Math.random() * list.length)];
+      const p = svg('path', { d: src.getAttribute('d'), class: 'arc-pulse' });
+      p.style.setProperty('--L', src.style.getPropertyValue('--L'));
+      p.addEventListener('animationend', () => p.remove());
+      arcsG.appendChild(p);
+    }
+    const startPulses = () => { if (!pulseTimer && !reduced()) pulseTimer = setInterval(pulse, 700); };
+    const stopPulses = () => { clearInterval(pulseTimer); pulseTimer = 0; };
+
+    // numbers in the text count up while the wave goes out
+    const counters = [];
+    const countUp = (node, to, ms) => {
+      if (reduced()) { node.textContent = fmt.int(to); return; }
+      const t0 = performance.now();
+      const step = (now) => { const k = Math.min(1, (now - t0) / ms); node.textContent = fmt.int(Math.round(to * (1 - Math.pow(1 - k, 3)))); if (k < 1) requestAnimationFrame(step); };
+      node.textContent = '0'; requestAnimationFrame(step);
+    };
+
+    // ---- picking a place: a route from home, a pin on it, and (from the search) a flight to it ----
+    let selected = null, selArc = null, pin = null, flyRaf = 0;
+    const apply = () => mapSvg.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${view.h}`);
+    function flyTo(next, ms = 900) {
+      cancelAnimationFrame(flyRaf);
+      if (reduced() || ms <= 0) { view = next; apply(); return; }
+      const from = { ...view }, t0 = performance.now();
+      const step = (now) => {
+        const k = Math.min(1, (now - t0) / ms), e = ease(k);
+        view = { x: from.x + (next.x - from.x) * e, y: from.y + (next.y - from.y) * e, w: from.w + (next.w - from.w) * e, h: from.h + (next.h - from.h) * e };
+        apply();
+        if (k < 1) flyRaf = requestAnimationFrame(step);
+      };
+      flyRaf = requestAnimationFrame(step);
+    }
+    const fullView = () => ({ x: vb0[0], y: vb0[1], w: vb0[2], h: vb0[3] });
+    function focusOn(id) {
+      const c = MAP.cent[id]; if (!c) return;
+      const w = vb0[2] / 2.4, h = w * (vb0[3] / vb0[2]);
+      flyTo({ x: clamp(c[0] - w / 2, vb0[0], vb0[0] + vb0[2] - w), y: clamp(c[1] - h / 2, vb0[1], vb0[1] + vb0[3] - h), w, h }, 1000);
+    }
+    function clearTarget() { if (selArc) selArc.remove(); if (pin) pin.remove(); selArc = pin = null; }
+    function select(id, { fly = false } = {}) {
       if (selected && paths[selected]) paths[selected].classList.remove('sel');
       selected = id;
+      clearTarget();
       if (id && paths[id]) { paths[id].classList.add('sel'); paths[id].parentNode.appendChild(paths[id]); }
       result.replaceChildren(...(id ? [el('b', null, nameOf(id)), ': ', statusText(id, info)] : []));
+      const c = id && MAP.cent[id];
+      if (c && homeAt && id !== home) {
+        selArc = routePath('sel', homeAt, c, 0);
+        pin = svg('g', { class: 'pin', transform: `translate(${c[0]} ${c[1]})` }, svg('circle', { r: 4, class: 'pin-ring' }), svg('circle', { r: 1.7, class: 'pin-dot' }));
+        arcsG.append(selArc, pin);
+        if (fly) focusOn(id);
+      }
     }
     mapSvg.addEventListener('pointermove', (e) => {
       const p = e.target.closest && e.target.closest('[data-id]');
@@ -95,63 +188,60 @@
     mapSvg.addEventListener('pointerleave', () => ui.tip.hide());
     mapSvg.addEventListener('click', (e) => { const p = e.target.closest && e.target.closest('[data-id]'); if (p && info[p.dataset.id]) select(p.dataset.id); });
     // zoom and pan
-    const apply = () => mapSvg.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${view.h}`);
     const zoom = (k, cx = view.x + view.w / 2, cy = view.y + view.h / 2) => {
+      cancelAnimationFrame(flyRaf);
       const w = clamp(view.w * k, vb0[2] / 10, vb0[2]), h = w * (vb0[3] / vb0[2]);
       view = { x: clamp(cx - (cx - view.x) * (w / view.w), vb0[0], vb0[0] + vb0[2] - w), y: clamp(cy - (cy - view.y) * (h / view.h), vb0[1], vb0[1] + vb0[3] - h), w, h };
       apply();
     };
     mapSvg.addEventListener('wheel', (e) => { if (!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); const r = mapSvg.getBoundingClientRect(); zoom(e.deltaY > 0 ? 1.15 : 0.87, view.x + ((e.clientX - r.left) / r.width) * view.w, view.y + ((e.clientY - r.top) / r.height) * view.h); }, { passive: false });
     let drag = null;
-    mapSvg.addEventListener('pointerdown', (e) => { if (view.w < vb0[2] - 1) { drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y }; mapSvg.setPointerCapture(e.pointerId); } });
+    mapSvg.addEventListener('pointerdown', (e) => { if (view.w < vb0[2] - 1) { cancelAnimationFrame(flyRaf); drag = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y }; mapSvg.setPointerCapture(e.pointerId); } });
     mapSvg.addEventListener('pointermove', (e) => { if (!drag) return; const r = mapSvg.getBoundingClientRect(); view.x = clamp(drag.vx - ((e.clientX - drag.x) / r.width) * view.w, vb0[0], vb0[0] + vb0[2] - view.w); view.y = clamp(drag.vy - ((e.clientY - drag.y) / r.height) * view.h, vb0[1], vb0[1] + vb0[3] - view.h); apply(); });
     mapSvg.addEventListener('pointerup', () => { drag = null; });
     const zoomBar = el('div', { class: 'zoombar' },
       el('button', { type: 'button', class: 'btn btn-ghost', 'aria-label': t('pp.zoomIn'), onclick: () => zoom(0.7) }, ui.icon('plus')),
       el('button', { type: 'button', class: 'btn btn-ghost', 'aria-label': t('pp.zoomOut'), onclick: () => zoom(1.4) }, ui.icon('minus')),
-      el('button', { type: 'button', class: 'btn btn-ghost', 'aria-label': t('pp.reset'), onclick: () => { view = { x: vb0[0], y: vb0[1], w: vb0[2], h: vb0[3] }; apply(); } }, ui.icon('refresh')));
-    const mapHost = el('div', { class: 'pp-map' }, mapSvg, zoomBar);
+      el('button', { type: 'button', class: 'btn btn-ghost', 'aria-label': t('pp.reset'), onclick: () => flyTo(fullView(), 700) }, ui.icon('refresh')));
+    const replayBtn = el('button', { type: 'button', class: 'btn btn-quiet pp-replay', onclick: () => play() }, ui.icon('play'), ' ', t('c3.replay'));
+    const mapHost = el('div', { class: 'pp-map' }, mapSvg, replayBtn, result, zoomBar);
 
-    // ---- 3D arcs ----
-    const globeHost = el('div', { class: 'pp-globe', hidden: true });
-    let g3 = null;
-    async function showGlobe() {
-      const ok = await R1().load3d();
-      if (!ok) { view2d(); return; }
-      if (!g3) {
-        try {
-          g3 = new HLIA.Globe3D(globeHost, { reduced: HLIA.util.reducedMotion() });
-          const colors = {};
-          for (const [id, x] of Object.entries(info)) if (x.cls !== 'none') colors[id] = CLASS_COLOR[x.cls] + (x.cls === 'home' ? '' : 'cc');
-          g3.paintLand(colors);
-          const list = [];
-          for (const id of model.PIDS) { const x = info[id]; if (x.cls === 'home' || x.cls === 'none' || x.cls === 'evisa') continue; list.push({ id, color: x.cls === 'live' || x.cls === 'limited' ? '#ffc14d' : '#35d6a0' }); }
-          const ll = g3.G.centLL[home];
-          if (ll) await g3.flyTo(ll[0], ll[1] * 0.8, 1400);
-          g3.showArcs(home, list);
-        } catch (e) { disposeGlobe(); view2d(); } // the browser refused a WebGL context: stay on the flat map
-      }
+    // ---- the show: the map goes dark, then the doors open outward from home and the routes are drawn ----
+    let seen = false;
+    function settle() { mapSvg.classList.remove('pre', 'go'); arcsG.replaceChildren(...routes().map((p) => { p.classList.add('still'); return p; })); counters.forEach((c) => countUp(c.node, c.to, 0)); }
+    function play() {
+      seen = true;
+      if (reduced()) { settle(); return; }
+      mapSvg.classList.remove('go'); mapSvg.classList.add('pre');
+      void mapSvg.getBoundingClientRect(); // the dark state must be drawn once, so the animation starts again
+      select(null);
+      arcsG.replaceChildren(...routes());
+      requestAnimationFrame(() => { mapSvg.classList.remove('pre'); mapSvg.classList.add('go'); });
+      counters.forEach((c) => countUp(c.node, c.to, WAVE + 400));
+      stopPulses(); setTimeout(startPulses, 2600);
     }
-    function disposeGlobe() { if (g3) { g3.dispose(); g3 = null; } }
-    const seg = el('div', { class: 'seg', role: 'group' });
-    let mode = 'map';
-    function view2d() { mode = 'map'; paintSeg(); mapHost.hidden = false; globeHost.hidden = true; disposeGlobe(); legendArcs.hidden = true; }
-    function paintSeg() {
-      seg.replaceChildren(
-        el('button', { type: 'button', 'aria-pressed': String(mode === 'map'), onclick: view2d }, t('pp.view.map')),
-        el('button', { type: 'button', 'aria-pressed': String(mode === 'globe'), onclick: async () => { mode = 'globe'; paintSeg(); mapHost.hidden = true; globeHost.hidden = false; legendArcs.hidden = false; await showGlobe(); } }, t('pp.view.globe')));
-    }
-    const legendArcs = el('p', { class: 'small', hidden: true }, t('pp.arcs'));
-    paintSeg();
+    const io = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver((es) => {
+      if (es[0].isIntersecting) { if (!seen) play(); else startPulses(); } else stopPulses();
+    }, { threshold: 0.35 });
+    if (io) io.observe(mapHost); else settle();
+    st.disposers = (st.disposers || []).concat(() => { if (io) io.disconnect(); stopPulses(); cancelAnimationFrame(flyRaf); });
 
     // ---- search ----
     const options = model.countries.filter((c) => info[c.id]).map((c) => ({ id: c.id, label: names[c.id], alt: i18n.countryAlt(c) + ' ' + c.iso2 + ' ' + c.id })).sort((a, b) => a.label.localeCompare(b.label, i18n.lang));
-    const search = ui.combobox({ id: 'pp-search', options, placeholder: t('pp.search.ph'), label: t('pp.search'), onChange(id) { select(id); } });
+    const search = ui.combobox({ id: 'pp-search', options, placeholder: t('pp.search.ph'), label: t('pp.search'), onChange(id) { select(id, { fly: true }); } });
 
-    // ---- legend, lists ----
+    // ---- legend: pointing at a kind lights those countries and dims the rest ----
+    const LEGEND = [['home', 'pp.home'], ['live', 'pp.live'], ['limited', 'pp.limited'], ['free', 'pp.free'], ['arrival', 'pp.arrival'], ['evisa', 'pp.evisa'], ['none', 'pp.none']];
+    const focusKind = (kind) => {
+      mapSvg.classList.toggle('focus', !!kind);
+      Object.values(paths).forEach((p) => p.classList.toggle('hit', !!kind && p.classList.contains('c-' + kind)));
+    };
     const legend = el('ul', { class: 'legend legend-map', role: 'list', 'aria-label': t('pp.legend') },
-      ...[['home', 'pp.home'], ['live', 'pp.live'], ['limited', 'pp.limited'], ['free', 'pp.free'], ['arrival', 'pp.arrival'], ['evisa', 'pp.evisa'], ['none', 'pp.none']].map(([c, k]) =>
-        el('li', null, el('i', { class: 'key key-' + c }), t(k))));
+      ...LEGEND.map(([c, k]) => {
+        const li = el('li', null, el('i', { class: 'key key-' + c }), t(k));
+        li.addEventListener('pointerenter', () => focusKind(c)); li.addEventListener('pointerleave', () => focusKind(null));
+        return li;
+      }));
     const chipList = (ids) => el('ul', { class: 'chips-static', role: 'list' }, ...ids.sort((a, b) => (names[a] || a).localeCompare(names[b] || b, i18n.lang)).map((id) => el('li', null, names[id] || id)));
     const rights = el('div', { class: 'pp-rights' },
       live.length || lim.length ? null : el('p', { class: 'small' }, t('pp.noRights')),
@@ -159,14 +249,19 @@
       lim.length ? el('div', null, el('h3', null, t('pp.listLimited'), ' ', el('span', { class: 'small' }, `(${lim.length})`)), chipList(lim)) : null);
 
     const tbl = HLIA.results.tableView([t('tbl.area'), t('tbl.value')], model.PIDS.filter((id) => names[id]).sort((a, b) => names[a].localeCompare(names[b], i18n.lang)).map((id) => [names[id], statusText(id, info)]));
-    const body = i18n.t('pp.body', { n: m.reach, of: m.outOf, live: live.length });
-    const sec = HLIA.results.section('passport', 'pp.title', null, [
-      el('div', { class: 'pp-tools' }, seg, el('div', { class: 'pp-search' }, el('label', { for: 'pp-search', class: 'field-label' }, t('pp.search')), search)),
-      result, mapHost, globeHost, legendArcs, legend, el('p', { class: 'pp-rank' }, t('pp.rank', { rank: m.rank })), rights, tbl, el('p', { class: 'small' }, t('pp.note')),
-    ], { intro: el('p', { class: 'read' }, body), sources: ['passport', 'blocs', 'henley'], wide: true });
-    sec.addEventListener('hlia:dispose', disposeGlobe);
-    st.disposers = (st.disposers || []).concat(disposeGlobe);
-    return sec;
+    // the opening sentence, with its numbers counting up as the wave goes out
+    const MARK = '\u0001';
+    const parts = i18n.t('pp.body', { n: MARK + 'n' + MARK, of: m.outOf, live: MARK + 'l' + MARK }).split(MARK);
+    const intro = el('p', { class: 'read' }, ...parts.map((part, i) => {
+      if (part !== 'n' && part !== 'l') return part;
+      const node = el('b', { class: 'count' }, fmt.int(part === 'n' ? m.reach : live.length));
+      counters.push({ node, to: part === 'n' ? m.reach : live.length });
+      return node;
+    }));
+    return HLIA.results.section('passport', 'pp.title', null, [
+      el('div', { class: 'pp-tools' }, el('div', { class: 'pp-search' }, el('label', { for: 'pp-search', class: 'field-label' }, t('pp.search')), search)),
+      mapHost, legend, el('p', { class: 'pp-rank' }, t('pp.rank', { rank: m.rank })), rights, tbl, el('p', { class: 'small' }, t('pp.note')),
+    ], { intro, sources: ['passport', 'blocs', 'henley'], wide: true });
   }
 
   // ---------- basics ----------
@@ -185,11 +280,13 @@
       const yes = have(b.k);
       const crowd = el('div', { class: 'crowd crowd-sm', 'aria-hidden': 'true' });
       for (let i = 0; i < 100; i++) crowd.appendChild(el('i', { class: i < n ? 'b' : 'a' }));
+      const mark = yes ? el('span', { class: 'fx-check' }, ui.icon('check')) : ui.icon('minus');
+      if (yes && HLIA.fx) HLIA.fx.check(mark);
       return el('li', { class: 'basic' + (yes ? ' yes' : ' no') },
         el('div', { class: 'basic-head' }, el('span', { class: 'ico' }, ui.icon(b.ico)), el('h3', null, t('b.' + b.k)), HLIA.results.infoFor(b.src)),
         crowd,
         el('p', { class: 'basic-n' }, el('b', null, t('b.lack', { n })), ' ', el('span', { class: 'small' }, t('b.' + b.k + '.d'))),
-        el('p', { class: 'basic-you' }, ui.icon(yes ? 'check' : 'minus'), ' ', t(yes ? 'b.have' : 'b.havenot')));
+        el('p', { class: 'basic-you' }, mark, ' ', t(yes ? 'b.have' : 'b.havenot')));
     });
     const count = BASICS.filter((b) => have(b.k)).length;
     const more = el('div', { class: 'basic-more' },
@@ -348,8 +445,6 @@
 
   HLIA.results2 = {
     build(R, st) {
-      (st.disposers || []).forEach((f) => f());
-      st.disposers = [];
       const out = [passportSection(R, st), basicsSection(R), lotterySection(R, st), timeSection(R)];
       if (HLIA.share) out.push(HLIA.share.section(R));
       out.push(nextSection(R));

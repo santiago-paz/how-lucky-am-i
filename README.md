@@ -1,4 +1,4 @@
-# How Lucky I Am
+# How Lucky Am I?
 
 A web page that shows where you stand among the 8.3 billion people alive. You answer a few questions about your life. The page then places you in eight areas, from income to freedom to travel, and as a whole. It uses public data from the World Bank, the UN, UBS and others. Your answers stay in your browser.
 
@@ -8,8 +8,9 @@ Where you were born, which passport you hold and who raised you explain more of 
 
 - An intro that draws every person alive as a dot on a world map. One dot is about one million people.
 - Five short sets of questions: where you live and your passports, work and income, home and savings, school and health, and travel and the people you can lean on. A panel beside the questions shows your place after each answer.
-- A report with a headline ("Top 11% of 8.3 billion"), a 3D globe that lights up the people you are ahead of, and a skyline of income steps with you marked on it. Below that: a pyramid of luck, eight bars (one per area), a home-versus-world chart, a passport map with a 3D arcs view, seven basics that many people lack, a birth lottery you can spin, and charts of how the world changed since you were born.
-- A share card you can download as an image, or share as text. By default it hides your country. It shows your overall place and the eight area bars, and never your income or your other answers.
+- A report with a headline ("Top 11% of 8.3 billion"), a 3D globe that lights up the people you are ahead of, and a skyline of income steps with you marked on it. Below that: a 3D pyramid of luck with a name and a head count on every step, eight 3D towers (one per area) read against a scale, with the eight bars under them, a home-versus-world chart, a flat passport map where the doors open outward from your home and a route is drawn to each place you pick, seven basics that many people lack, a birth lottery you can spin, and charts of how the world changed since you were born.
+- Small Lottie animations: a four-leaf clover on the headline card, checks that draw themselves on the basics, and sparkles around the share card.
+- A share card (1080 by 1350, made for a phone feed) that you can download as an image, or share as text. By default it hides your country. It shows your overall place and the eight area bars, and never your income or your other answers.
 - English and Spanish.
 - A "Sources and method" section. Every chart has an (i) button that names its dataset and year.
 
@@ -51,11 +52,12 @@ The committed files in `assets/js/data/` come from a small pipeline. You only ne
 npm run fetch        # download raw data into data-raw/ (needs the network, not committed)
 npm run build:data   # world.js and passports.js
 npm run build:map    # map.js and globe.js
-npm run build:3d     # globe3d.js, the three.js bundle
+npm run build:3d     # globe3d.js, the three.js bundle (the globe and the 3D charts)
+npm run build:lottie # the Lottie files in assets/lottie/
 npm test             # 15 tests
 ```
 
-`npm run build` runs the three build steps in order. Curated inputs that no API serves are in `data/curated/`: the UBS tables and the treaty list.
+`npm run build` runs the data, map and 3D steps in order. The Lottie files are plain JSON made by `scripts/make-lottie.mjs`, so you only run that step when you change an animation. Curated inputs that no API serves are in `data/curated/`: the UBS tables and the treaty list.
 
 ## Project layout
 
@@ -64,7 +66,9 @@ index.html            the page
 assets/css/           tokens, base, components, scenes, results
 assets/js/            the app, one file per job (model, wizard, results, share, and so on)
 assets/js/data/       generated data
-assets/src/           source of the 3D bundle
+assets/js/vendor/     the lottie-web player, with its licence
+assets/lottie/        the Lottie animations
+assets/src/           source of the 3D bundle (the globe, and the pyramid and tower charts)
 assets/fonts/         Mona Sans and Newsreader, with their licences
 scripts/              fetch and build scripts
 data/curated/         hand-checked inputs
@@ -90,7 +94,7 @@ Everything runs in the browser. The page sends no request with your answers. Ans
 
 ## Accessibility
 
-The site works with a keyboard and a screen reader. The pyramid, the eight bars, the comparison, the passport map and the time charts each have a table version, and the other sections give their numbers as text. The "Pause motion" button stops the twinkling dots and the turning globe, and the site follows your system setting for reduced motion. If your browser has no WebGL, the 3D views fall back to flat charts.
+The site works with a keyboard and a screen reader. The pyramid, the eight bars, the comparison, the passport map and the time charts each have a table version, and the other sections give their numbers as text. The "Pause motion" button stops the twinkling dots and the turning globe, and the site follows your system setting for reduced motion. With motion paused, the Lottie animations show a still picture. If your browser has no WebGL, the 3D charts are hidden and the flat pyramid and the bars stay. If the Lottie player cannot load, the page keeps its plain icons.
 
 ## Licences
 
@@ -100,6 +104,7 @@ Third-party material keeps its own terms:
 
 - Mona Sans and Newsreader: SIL Open Font License (files in `assets/fonts/`).
 - three.js: MIT.
+- lottie-web (light SVG build): MIT. The licence is in `assets/js/vendor/LICENSE-lottie-web.md`.
 - Passport matrix from `imorte/passport-index-data`: MIT.
 - Coastlines and places from Natural Earth: public domain.
 - Data from the World Bank, WHO, UNDP, UN, ILO, ITU, FAO and others: each under its own terms. Check them before you reuse the data files.

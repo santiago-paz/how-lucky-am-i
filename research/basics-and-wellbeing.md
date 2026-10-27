@@ -1,6 +1,6 @@
 # R2: Everyday basics and wellbeing statistics
 
-Prepared on 2026-10-27 for the project "How Lucky I Am". Every row says where I read the number and how sure I am.
+Prepared on 2026-10-27 for the project "How Lucky Am I?". Every row says where I read the number and how sure I am.
 
 ## How to read this file
 

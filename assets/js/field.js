@@ -193,23 +193,36 @@
       for (let i = 0; i < n; i++) this.delay[i] = DMAX * (0.85 * ((dest.x[i] - lo) / (hi - lo || 1)) + 0.15 * (this.jit[2 * i] + 0.5));
       this.trans = { from, to: mode };
       this.u = 0;
-      const p = tween(duration, (e) => { this.u = e; this.render(); }, (t) => t).then(() => {
+      const raw = tween(duration, (e) => { this.u = e; this.render(); }, (t) => t);
+      const p = raw.then(() => {
         this.mode = mode; this.trans = null; this.u = 0; this.grid = null; this.render();
       });
-      this.trans.cancel = p.cancel;
+      this.trans.cancel = raw.cancel;
       this.kick();
       return p;
+    }
+    // Skip: a move that is running, and the sweep line, end where they were going.
+    finish() {
+      if (this.trans) {
+        const to = this.trans.to;
+        if (this.trans.cancel) this.trans.cancel();
+        this.mode = to; this.trans = null; this.u = 0; this.grid = null;
+      }
+      if (this.sweepRaw) this.sweepRaw.cancel();
+      this.sweepX = null;
+      this.render();
     }
     // Pass the sweep line over the income layout up to your position, calling onProgress(0..1, x).
     sweep(ms = 2600, onProgress) {
       if (!this.user) return Promise.resolve();
       const x0 = this.inc.left - 6;
       const x1 = this.inc.xOfZ(this.user.z);
-      return tween(ms, (e) => {
+      this.sweepRaw = tween(ms, (e) => {
         this.sweepX = lerp(x0, x1, e);
         if (onProgress) onProgress(e, this.sweepX);
         this.render();
-      }, ease.inOutSine).then(() => { this.sweepX = null; this.render(); });
+      }, ease.inOutSine);
+      return this.sweepRaw.then(() => { this.sweepX = null; this.render(); });
     }
 
     // ---------- pointer ----------

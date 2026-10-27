@@ -67,6 +67,20 @@
     if (!loading) loading = loadScript('assets/js/data/globe.js').then(() => loadScript('assets/js/globe3d.js')).then(() => !!HLIA.Globe3D).catch(() => false);
     return loading;
   }
+  // Make a 3D chart when its box first comes into view, and give it back when the report is rebuilt.
+  function lazy3d(host, make) {
+    const box = { chart: null };
+    if (typeof IntersectionObserver === 'undefined') { host.hidden = true; return box; }
+    const io = new IntersectionObserver(async (es) => {
+      if (!es[0].isIntersecting || box.chart) return;
+      io.disconnect();
+      if (!(await load3d())) { host.hidden = true; return; }
+      try { box.chart = make(); } catch (e) { host.hidden = true; } // no WebGL: the flat version below still works
+    }, { threshold: 0.2 });
+    io.observe(host);
+    st.disposers.push(() => { io.disconnect(); if (box.chart) { box.chart.dispose(); box.chart = null; } });
+    return box;
+  }
   HLIA.results = { load3d, infoFor, section, tableView };
 
   // ---------- navigation ----------
@@ -80,20 +94,23 @@
   function watchNav() {
     navIO && navIO.disconnect();
     const links = Object.fromEntries($$('.r-nav a').map((a) => [a.dataset.sec, a]));
+    const order = ['place', 'step-money', 'pyramid', 'areas', 'compare', 'passport', 'basics', 'lottery', 'time', 'share', 'method'];
+    const live = new Set(); // the sections that cross the reading line right now
     navIO = new IntersectionObserver((entries) => {
-      entries.forEach((e) => {
-        if (!e.isIntersecting) return;
-        const id = e.target.id === 'step-money' ? 'money' : e.target.id;
-        Object.values(links).forEach((a) => a.removeAttribute('aria-current'));
-        if (links[id]) {
-          links[id].setAttribute('aria-current', 'true');
-          // scroll only the nav strip, never the page (scrollIntoView would cancel a smooth scroll in progress)
-          const bar = links[id].closest('.r-nav');
-          bar.scrollLeft = links[id].offsetLeft - (bar.clientWidth - links[id].offsetWidth) / 2;
-        }
-      });
+      entries.forEach((e) => (e.isIntersecting ? live.add(e.target.id) : live.delete(e.target.id)));
+      // the money step sits inside the place section, so when both are live the later one in the list wins
+      const last = order.filter((k) => live.has(k)).pop();
+      if (!last) return;
+      const id = last === 'step-money' ? 'money' : last;
+      Object.values(links).forEach((a) => a.removeAttribute('aria-current'));
+      if (links[id]) {
+        links[id].setAttribute('aria-current', 'true');
+        // scroll only the nav strip, never the page (scrollIntoView would cancel a smooth scroll in progress)
+        const bar = links[id].closest('.r-nav');
+        bar.scrollLeft = links[id].offsetLeft - (bar.clientWidth - links[id].offsetWidth) / 2;
+      }
     }, { rootMargin: '-45% 0px -50% 0px' });
-    ['place', 'step-money', 'pyramid', 'areas', 'compare', 'passport', 'basics', 'lottery', 'time', 'share', 'method'].forEach((id) => { const n = document.getElementById(id); n && navIO.observe(n); });
+    order.forEach((id) => { const n = document.getElementById(id); n && navIO.observe(n); });
   }
 
   // ---------- story: verdict and money ----------
@@ -113,14 +130,18 @@
     const pctEl = el('span', { class: 'v-pct' }, '100');
     const numEl = el('p', { class: 'v-num', 'aria-live': 'off' }, el('span', { class: 'v-top' }, i18n.lang === 'es' ? 'Top' : 'Top'), pctEl, el('span', { class: 'v-sym' }, '%'));
     const moreEl = el('p', { class: 'v-more' }, '');
+    const clover = el('span', { class: 'v-clover', 'aria-hidden': 'true' });
+    const arrow = el('span', { class: 'v-arrow', 'aria-hidden': 'true' });
     const verdict = el('article', { class: 'story-step', id: 'step-verdict' }, el('div', { class: 'story-card' },
+      clover,
       el('p', { class: 'v-lead' }, t('v.lead')),
       numEl,
       el('p', { class: 'v-of' }, t('v.of', { pop: i18n.people(HLIA.DATA.meta.pipPop) })),
       moreEl,
       el('p', { class: 'read v-note' }, verdictNote(top)),
-      el('p', { class: 'v-scroll small' }, t('v.scroll')),
-      el('button', { type: 'button', class: 'btn btn-quiet v-skip', onclick: () => skipStory() }, t('v.skip'))));
+      el('div', { class: 'v-actions' },
+        el('button', { type: 'button', class: 'btn btn-quiet v-skip', 'data-mode': 'skip', onclick: onStoryButton }, t('v.skip')),
+        el('p', { class: 'v-scroll small' }, arrow, t('v.scroll')))));
 
     // money
     const inc = R.income;
@@ -139,12 +160,15 @@
     const zOf = (p) => 0.5 * Math.pow(2000, p / 1000);
     slider.value = String(posOf(inc.z));
     slider.style.setProperty('--fill', slider.value / 10 + '%');
-    const resetBtn = el('button', { type: 'button', class: 'btn btn-quiet', hidden: true, onclick() { setTry(null); } }, t('m.reset'));
+    // the button and the line of text have a row of their own that is always there, so the card keeps its height
+    const resetBtn = el('button', { type: 'button', class: 'btn btn-quiet', disabled: true, onclick() { setTry(null); } }, t('m.reset'));
+    resetBtn.style.visibility = 'hidden';
     function setTry(z) {
       st.tryZ = z;
       const zz = z == null ? inc.z : z;
       slider.value = String(posOf(zz)); slider.style.setProperty('--fill', slider.value / 10 + '%');
-      resetBtn.hidden = z == null;
+      resetBtn.disabled = z == null;
+      resetBtn.style.visibility = z == null ? 'hidden' : '';
       tryTop.textContent = z == null ? '' : t('m.tryTop', { day: day(zz), pct: pctSmart(1 - model.cdf(model.WF, zz)) });
       if (st.globe) st.globe.setUser({ z: zz, id: S.a.residence });
       if (st.fallback) st.fallback.setUser({ z: zz, id: S.a.residence });
@@ -156,14 +180,14 @@
     const money = el('article', { class: 'story-step', id: 'step-money' }, el('div', { class: 'story-card' },
       el('h2', { id: 'money-t' }, t('m.title')), el('p', { class: 'read' }, t('m.body')),
       youEl, facts,
-      el('div', { class: 'm-try' }, el('label', { for: 'm-try', class: 'field-label' }, t('m.try')), slider, tryTop, resetBtn),
+      el('div', { class: 'm-try' }, el('label', { for: 'm-try', class: 'field-label' }, t('m.try')), slider, el('div', { class: 'm-tryrow' }, tryTop, resetBtn)),
       seg,
       el('p', { class: 'small m-src' }, t('m.src'), ' ', infoFor(['pip', 'pipLines', 'gwwc']))));
 
     // the page's one h1 while the report is showing, for screen readers and the outline
     const sec = el('section', { id: 'place', class: 'story', 'aria-label': t('nav.place') }, el('h1', { class: 'sr-only' }, t('v.h1')), stage,
       el('div', { class: 'story-steps' }, verdict, el('div', { id: 'money', class: 'story-anchor' }), money));
-    sec.refs = { host, labels, pctEl, numEl, moreEl, seg, setTry };
+    sec.refs = { host, labels, pctEl, numEl, moreEl, seg, setTry, clover, arrow };
     return sec;
   }
 
@@ -178,15 +202,27 @@
   function finishCounter(refs) {
     setCounter(refs, 1);
     refs.numEl.setAttribute('aria-label', t('hud.top', { pct: topLabel(st.R.overall.ahead) }));
-    const skip = document.querySelector('.v-skip');
-    if (skip) skip.hidden = true;
+    // The button keeps its place so the card never changes height: it says "skip" while the
+    // reveal plays and "play it again" after. The flat fallback has nothing to replay.
+    const btn = document.querySelector('.v-skip');
+    if (btn) {
+      btn.dataset.mode = 'replay';
+      btn.textContent = t('v.replay');
+      btn.style.visibility = st.globe ? '' : 'hidden';
+    }
   }
   function skipStory() {
     const refs = st.refs;
-    if (st.globe) { st.globe.tweens.length = 0; st.globe.setWaveInstant(); }
-    if (st.fallback) st.fallback.sweepX = null;
+    if (st.globe) st.globe.finishAll();
+    if (st.fallback) st.fallback.finish();
     finishCounter(refs);
   }
+  function replayStory() {
+    const btn = document.querySelector('.v-skip');
+    if (btn) { btn.dataset.mode = 'skip'; btn.textContent = t('v.skip'); }
+    playStory(st.refs);
+  }
+  const onStoryButton = (ev) => (ev.currentTarget.dataset.mode === 'replay' ? replayStory() : skipStory());
 
   async function playStory(refs) {
     setCounter(refs, 0);
@@ -195,15 +231,23 @@
     if (st.globe) {
       const g = st.globe;
       g.pointsMat.uniforms.uWave.value = 0;
-      if (reduced) { g.setWaveInstant(); finishCounter(refs); return; }
-      await g.flyIn(2400);
-      await g.wave(3800, (lit, e) => setCounter(refs, e));
+      // reduced motion, or the page came back already scrolled below the verdict: show the result, skip the show
+      const verdict = document.getElementById('step-verdict');
+      const scrolledPast = !!verdict && verdict.getBoundingClientRect().bottom < 140;
+      if (reduced || g.mix > 0.02 || scrolledPast) { g.setWaveInstant(); finishCounter(refs); return; }
+      // the number starts to fall at once: the camera comes in while the lights turn on, not before
+      const fly = g.flyIn(2400);
+      await g.wave(4000, (lit, e) => setCounter(refs, e));
+      await fly;
       finishCounter(refs);
     } else if (st.fallback) {
       const f = st.fallback;
       if (reduced) { finishCounter(refs); return; }
-      await f.setMode('income', { duration: 2000 });
-      await f.sweep(3200, (e) => setCounter(refs, e));
+      // the dots move into the income picture, and the sweep starts a moment later, while they are still on their way
+      const morph = f.setMode('income', { duration: 1800 });
+      await new Promise((r) => setTimeout(r, 300));
+      await f.sweep(3800, (e) => setCounter(refs, e));
+      await morph;
       finishCounter(refs);
     } else finishCounter(refs);
   }
@@ -237,6 +281,28 @@
     };
   }
 
+  // On a wide screen the globe sits in the free strip to the right of the verdict card, and the skyline in the
+  // free strip to the left of the money card. This measures those strips, so a card can never cover the picture.
+  // It returns where each picture is centred (as a share of the stage width) and how much room it has.
+  function stageLayout(w) {
+    const stage = st.refs && st.refs.host.parentElement;
+    if (stage) stage.style.removeProperty('--hint-x');
+    if (w < 900 || !st.refs) return { globe: 0, sky: 0 };
+    const host = st.refs.host.getBoundingClientRect();
+    const edge = 16, gap = 28;
+    const vc = document.querySelector('#step-verdict .story-card');
+    const mc = document.querySelector('#step-money .story-card');
+    // the cards only move up and down while scrolling, so their sides are stable
+    let g0 = w * 0.5, g1 = w - edge, s0 = edge, s1 = w * 0.5;
+    if (vc) g0 = vc.getBoundingClientRect().right - host.left + gap;
+    if (mc) s1 = mc.getBoundingClientRect().left - host.left - gap;
+    g0 = Math.min(g0, w * 0.75);
+    s1 = Math.max(s1, w * 0.25);
+    const centre = (a, b) => ((a + b) / 2 - w / 2) / w;
+    if (stage) stage.style.setProperty('--hint-x', (g0 + g1) / 2 + 'px');
+    return { globe: centre(g0, g1), sky: centre(s0, s1), globeW: (g1 - g0) / w, skyW: (s1 - s0) / w };
+  }
+
   async function mountStage(sec) {
     const refs = sec.refs;
     st.refs = refs;
@@ -248,9 +314,7 @@
         const onLabels = labelLayer(refs);
         if (st.globe) { st.globe.opts.onFrame = onLabels; st.globe.opts.onHover = hoverTip; st.globe.attach(refs.host); }
         else {
-          // wide screens: the card sits left of the globe, then right of the skyline
-          const shift = (w) => (w >= 900 ? { globe: 0.17, sky: -0.2 } : { globe: 0, sky: 0 });
-          st.globe = new HLIA.Globe3D(refs.host, { reduced: HLIA.util.reducedMotion(), onHover: hoverTip, onFrame: onLabels, shift });
+          st.globe = new HLIA.Globe3D(refs.host, { reduced: HLIA.util.reducedMotion(), onHover: hoverTip, onFrame: onLabels, shift: stageLayout });
         }
         st.globe.setUser(user);
         return;
@@ -304,6 +368,7 @@
         el('span', { class: 'pyr-track', style: { '--w': w + '%' } }, bar, k === you ? el('span', { class: 'pyr-you' }, t('p.you')) : null),
         el('span', { class: 'pyr-n' }, people));
       const show = (ev) => {
+        if (list.closest('.has3d')) return; // the 3D chart is up and the steps are only for screen readers
         const r = row.getBoundingClientRect();
         ui.tip.show([el('strong', null, people), el('div', null, t('p.b' + k)), el('div', { class: 'small' }, t('p.range', { a: fmt.dec(edges[k] * 100, edges[k] * 100 % 1 ? 1 : 0), b: fmt.dec(edges[k + 1] * 100, edges[k + 1] * 100 % 1 ? 1 : 0) }))], ev.clientX || r.left + r.width / 2, ev.clientY || r.top);
       };
@@ -312,8 +377,42 @@
     }
     const list = el('ol', { class: 'pyr', role: 'list', 'aria-label': t('p.alt', { step: t('p.b' + you) }) }, ...rows);
     const tbl = tableView([t('tbl.area'), t('tbl.people'), t('tbl.share')], [6, 5, 4, 3, 2, 1, 0].map((k) => [t('p.b' + k), i18n.people(share(k) * pop, { bare: true }), fmt.dec(share(k) * 100, share(k) * 100 < 1 ? 1 : 0) + '%']));
-    return section('pyramid', 'p.title', null, [list, tbl], { introKey: 'p.body', sources: ['pip', 'wdi', 'ubs', 'wgi'] });
+
+    // the same pyramid in 3D: one slab per step, as wide as its share of people, with a dot for about a million of them
+    const host = el('div', { class: 'c3-host pyr3d', role: 'img', 'aria-label': t('p.alt', { step: t('p.b' + you) }) });
+    const rowByK = {};
+    rows.forEach((r) => { rowByK[r.dataset.k] = r; });
+    const mark = (k) => { rows.forEach((r) => r.classList.toggle('hot', +r.dataset.k === k)); };
+    const wrap = el('div', { class: 'pyr-wrap' }, host, list);
+    const DOT = 2e6; // one dot on a step is about two million people
+    const view = lazy3d(host, () => {
+      const chart = new HLIA.Pyramid3D(host, {
+        tiers: [0, 1, 2, 3, 4, 5, 6].map((k) => ({ k, share: share(k), color: PYRAMID_TINT[k], name: t('p.b' + k), count: i18n.people(share(k) * pop, { bare: true }) })),
+        you, dots: Math.round(pop / DOT), colors: { you: HLIA.util.cssVar('--you') || '#ffc14d' },
+        labels: { you: t('p.you'), dot: t('p.dot', { n: i18n.people(DOT, { bare: true }) }) }, reduced: HLIA.util.reducedMotion(),
+        onHover(h) {
+          if (!h) { ui.tip.hide(); mark(-1); return; }
+          const k = h.index;
+          mark(k);
+          ui.tip.show([el('strong', null, i18n.people(share(k) * pop, { bare: true })), el('div', null, t('p.b' + k)), el('div', { class: 'small' }, t('p.range', { a: fmt.dec(edges[k] * 100, edges[k] * 100 % 1 ? 1 : 0), b: fmt.dec(edges[k + 1] * 100, edges[k + 1] * 100 % 1 ? 1 : 0) }))], h.clientX, h.clientY);
+        },
+      });
+      host.appendChild(el('button', { type: 'button', class: 'btn btn-quiet c3-replay', onclick: () => chart.play() }, ui.icon('refresh'), ' ', t('c3.replay')));
+      host.c3 = chart;
+      wrap.classList.add('has3d'); // the chart carries the names and counts itself, so the flat steps stay for screen readers only
+      return chart;
+    });
+    // pointing at a row lifts its slab
+    rows.forEach((r) => {
+      r.addEventListener('pointerenter', () => view.chart && view.chart.highlight(+r.dataset.k));
+      r.addEventListener('focus', () => view.chart && view.chart.highlight(+r.dataset.k));
+      r.addEventListener('pointerleave', () => view.chart && view.chart.highlight(-1));
+      r.addEventListener('blur', () => view.chart && view.chart.highlight(-1));
+    });
+    return section('pyramid', 'p.title', null, [wrap, tbl], { introKey: 'p.body', sources: ['pip', 'wdi', 'ubs', 'wgi'], wide: true });
   }
+  // the slabs of the 3D pyramid, from the bottom half up to the top 0.1%
+  const PYRAMID_TINT = ['#5a49d6', '#6a58e4', '#7d6bf0', '#9a8bf8', '#b5a8ff', '#cfc6ff', '#ece8ff'];
 
   // ---------- eight areas ----------
   function areaText(d, R) {
@@ -343,6 +442,7 @@
     education: ['edstats', 'hdr', 'wic'], basics: ['wdi', 'jmp', 'sdg7', 'itu', 'fao', 'unhabitat'], safety: ['ilo', 'findex', 'gallup', 'wdi'], stability: ['wgi', 'freedom'],
   };
   function areasSection(R) {
+    const c = model.byId[S.a.residence];
     const rows = R.dims.map((d) => {
       const fill = el('span', { class: 'bar-fill', style: { width: '0%' } });
       const row = el('li', { class: 'area-row', 'data-id': d.id, tabindex: '0' },
@@ -362,9 +462,35 @@
     });
     const list = el('ul', { class: 'areas', role: 'list' }, ...rows);
     const tbl = tableView([t('tbl.area'), t('tbl.value')], R.dims.map((d) => [t('dim.' + d.id), `${t('a.ahead', { pct: pctInt(d.global) })} (${t('a.top', { pct: topLabel(1 - d.global) })})`]));
-    const c = model.byId[S.a.residence];
     const estNote = c.est && c.est.length > 4 ? el('p', { class: 'small' }, t('a.est')) : null;
-    const sec = section('areas', 'a.title', null, [list, estNote, tbl], { introKey: 'a.body' });
+    // the same eight areas as towers in 3D: your height in emerald, the typical person in your country as a violet ring
+    const country = i18n.countryName(c);
+    const host = el('div', { class: 'c3-host towers3d', role: 'img', 'aria-label': t('tw.alt', { country }) });
+    const keyItem = (color, text) => el('span', null, el('i', { style: { background: color } }), text);
+    host.appendChild(el('div', { class: 'c3-key' }, keyItem('var(--ahead)', t('c.you')), keyItem('var(--context)', t('c.typical', { country })), keyItem('var(--you)', t('tw.overall'))));
+    const hot = (id) => rows.forEach((r) => r.classList.toggle('hot', r.dataset.id === id));
+    const view = lazy3d(host, () => {
+      const chart = new HLIA.Towers3D(host, {
+        areas: R.dims.map((d) => ({ id: d.id, value: d.global, typical: d.typical, text: t('a.top', { pct: topLabel(1 - d.global) }), name: t('dim.' + d.id), icon: ui.icon(AREA_ICON[d.id]) })),
+        overall: { value: R.overall.pct, text: t('a.top', { pct: topLabel(R.overall.ahead) }), name: t('tw.overall') },
+        colors: { you: HLIA.util.cssVar('--you') || '#ffc14d', area: HLIA.util.cssVar('--ahead') || '#35d6a0', typical: HLIA.util.cssVar('--context') || '#9b8cff' },
+        labels: { ahead: t('tw.ahead'), all: t('tw.all'), half: t('tw.half') }, reduced: HLIA.util.reducedMotion(),
+        onHover(h) {
+          if (!h) { ui.tip.hide(); hot(null); return; }
+          const d = R.dims[h.index];
+          hot(d.id);
+          ui.tip.show([el('strong', null, `${t('dim.' + d.id)}: ${t('a.top', { pct: topLabel(1 - d.global) })}`), el('div', null, `${t('c.typical', { country })}: ${t('a.top', { pct: topLabel(1 - d.typical) })}`)], h.clientX, h.clientY);
+        },
+      });
+      host.appendChild(el('button', { type: 'button', class: 'btn btn-quiet c3-replay', onclick: () => chart.play() }, ui.icon('refresh'), ' ', t('c3.replay')));
+      host.c3 = chart;
+      return chart;
+    });
+    rows.forEach((r, i) => {
+      r.addEventListener('pointerenter', () => view.chart && view.chart.highlight(i));
+      r.addEventListener('pointerleave', () => view.chart && view.chart.highlight(-1));
+    });
+    const sec = section('areas', 'a.title', null, [host, list, estNote, tbl], { introKey: 'a.body', wide: true });
     // each bar fills when its own row comes into view, so a tall list on a short screen still fills
     const fillRow = (r) => { r.fill.style.width = r.target * 100 + '%'; };
     if (typeof IntersectionObserver === 'undefined') rows.forEach(fillRow);
@@ -495,6 +621,8 @@
 
   // ---------- build the whole report ----------
   function build() {
+    (st.disposers || []).forEach((f) => f());
+    st.disposers = [];
     const R = st.R;
     const root = $('#results');
     const story = storySection(R);
@@ -506,18 +634,22 @@
     return story;
   }
 
+  // the clover and the bobbing arrow on the verdict card (the card is built again when the language changes)
+  function startFx(refs) { if (HLIA.fx) { HLIA.fx.clover(refs.clover); HLIA.fx.arrow(refs.arrow); } }
+
   async function show() {
     st.R = S.compute();
     if (!st.R) return;
     const first = !st.played;
     const story = build();
     await mountStage(story);
+    startFx(story.refs);
     watchSteps(story.refs);
-    if (first) { st.played = true; setTimeout(() => playStory(story.refs), 350); }
+    if (first) { st.played = true; requestAnimationFrame(() => playStory(story.refs)); } // no wait: the number falls as soon as the page is up
     else { finishCounter(story.refs); if (st.globe) st.globe.setWaveInstant(); }
   }
   // rebuild text when the language changes; keep the globe
-  HLIA.bus.on('lang', () => { if (S.view === 'results' && st.R) { st.R = S.compute(); const story = build(); mountStage(story).then(() => { watchSteps(story.refs); finishCounter(story.refs); st.globe && st.globe.setWaveInstant(); }); } });
+  HLIA.bus.on('lang', () => { if (S.view === 'results' && st.R) { st.R = S.compute(); const story = build(); mountStage(story).then(() => { startFx(story.refs); watchSteps(story.refs); finishCounter(story.refs); st.globe && st.globe.setWaveInstant(); }); } });
 
   HLIA.results.show = show;
   HLIA.results.state = st;

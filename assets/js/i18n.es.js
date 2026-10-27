@@ -1,7 +1,7 @@
 /* Textos en español. Español neutro, frases cortas. */
 HLIA.i18n.add('es', {
-  'meta.title': 'How Lucky I Am',
-  'meta.description': 'Responde unas preguntas y mira dónde estás entre los 8.200 millones de personas que viven hoy, con datos públicos del Banco Mundial, la ONU y otras fuentes. Tus respuestas no salen de tu navegador.',
+  'meta.title': 'How Lucky Am I?',
+  'meta.description': 'Responde unas preguntas y mira dónde estás entre los 8.300 millones de personas que viven hoy, con datos públicos del Banco Mundial, la ONU y otras fuentes. Tus respuestas no salen de tu navegador.',
   'skip': 'Saltar al contenido',
   'lang.label': 'Idioma',
   'bar.restart': 'Empezar de nuevo',

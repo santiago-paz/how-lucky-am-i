@@ -1,6 +1,6 @@
 # R1: Global income and wealth anchors, and birth-lottery research
 
-Prepared on 2026-10-27 for "How Lucky I Am". Newest editions found: PIP September 2026, WIR 2026, UBS Global Wealth Report 2026, Findex 2025 (survey year 2024), UN WPP 2024.
+Prepared on 2026-10-27 for "How Lucky Am I?". Newest editions found: PIP September 2026, WIR 2026, UBS Global Wealth Report 2026, Findex 2025 (survey year 2024), UN WPP 2024.
 
 Scratch root (SP): `$SP` (a temporary folder that is not part of this repository)
 Raw downloads: `$SP/downloads/r1/<name>/out`. Extracted PDF text: `$SP/work/*.txt`. Helper scripts: `$SP/scripts/`.

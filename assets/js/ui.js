@@ -31,6 +31,7 @@
     plus: 'M12 5v14M5 12h14',
     minus: 'M5 12h14',
     refresh: 'M20 12a8 8 0 1 1-2.500-5.800M20 4v4.500h-4.500',
+    play: 'M8 5.500v13l10.500-6.500L8 5.500Z',
     table: 'M4 5.500h16v13H4zM4 10h16M4 14.200h16M9.500 5.500v13',
   };
   function icon(name, size) {

@@ -1,6 +1,6 @@
 // Small fetch helpers for the data build scripts: retries, timeouts, a worker pool.
 
-const UA = 'how-lucky-i-am-data-build/1.0 (educational project)';
+const UA = 'how-lucky-am-i-data-build/1.0 (educational project)';
 
 export async function getText(url, { retries = 5, timeout = 90000 } = {}) {
   let lastError;

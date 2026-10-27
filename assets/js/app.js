@@ -45,7 +45,8 @@
     $('#restart').hidden = v === 'intro';
     ui.tip.hide();
     if (push) history.pushState({ v }, '', v === 'intro' ? location.pathname + location.search : '#/' + v);
-    scrollTo(0, 0);
+    // a new view starts at the top at once; the page's smooth scrolling would sweep past the whole report on the way
+    scrollTo({ top: 0, behavior: 'instant' });
     S.save();
     if (v === 'intro' && hero) hero.render();
   }

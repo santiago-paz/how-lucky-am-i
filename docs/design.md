@@ -6,7 +6,7 @@ Written before the build, then checked against the brief. The check changed the 
 
 A person lands here from a shared link, usually on a phone. They have a few minutes. The page has three jobs, in this order:
 
-1. Let them feel where they stand among 8.2 billion people.
+1. Let them feel where they stand among 8.3 billion people.
 2. Show them why: where you are born and who raised you explain most of your income.
 3. Give them sources they can check, so they can trust the number.
 
@@ -46,7 +46,7 @@ What a generic answer to this brief looks like: a dark dashboard with a neon gra
 
 1. **Gradient hero number.** The brief asks for a giant counter. A gradient on it is the default treatment. Changed: the number is plain ink and is tied to a sweep across the field. A line moves across the lights as the counter falls, and every light behind you turns emerald. The number lands where the line stops.
 2. **Neon trio everywhere.** Three bright hues used as decoration would be the same dashboard as any other. Changed: each hue has one meaning (above), gold appears only for you, and the neon is kept for small marks and glows.
-3. **Card grid.** Results as eight equal cards. Changed: scenes with different compositions. The areas are one list of bars. The comparison is a dumbbell chart. The map is full width.
+3. **Card grid.** Results as eight equal cards. Changed: scenes with different compositions. The areas are one list of bars, with the same eight numbers as 3D towers above it. The ranking is a 3D pyramid with its names and head counts on the chart itself. The comparison is a dumbbell chart. The passport map is flat and full width: the doors open outward from your home, and the routes are drawn from it.
 4. **Eyebrow labels, numbered sections, monospace data labels, arrows on buttons.** None used. The only numbers are the wizard steps, which are a real sequence.
 5. **Everything fades in on scroll.** Changed: one orchestrated moment (the sweep) and motion that answers the person (hover, drag, spin, toggle).
 6. **Hero figure in a display face.** The dataviz rules ask for the same sans as the interface. Mona Sans does both jobs; the serif stays in paragraphs.
@@ -55,4 +55,9 @@ What a generic answer to this brief looks like: a dark dashboard with a neon gra
 
 - Every chart has a table view, keyboard focus that shows what hover shows, and values that never live only in a tooltip.
 - Reduced motion: the sweep and the morph jump to their end state.
+- The 3D charts are a second view of numbers that already sit in a list or a table. Hovering a tower lights its row in the list of areas, and the other way round. The pyramid carries its names and counts on the chart, and its flat steps stay for screen readers. Without WebGL the 3D charts are hidden and the flat version shows.
+- The Lottie animations are small and decorative: a clover, a check, sparkles and an arrow. They play once, or loop only while they are on screen. With reduced motion they show a still picture, and the page works if the player cannot load.
+- Short windows: the result card, the live panel, the money step, the passport map and the share card are checked at 1104 by 549 pixels, so nothing sits under the top bar and no globe or card is cut off.
+- The share card is the one thing people post, so its spacing is fixed on one grid: 80 px at the sides, about 55 px between blocks, and type that stays readable when the card is shown 390 px wide. "Top", the figure and the percent sign stand on one baseline, and the country (only if the person turns it on) sits at the right of the name line, so it never pushes the layout down.
+- The number on the headline card starts to fall the moment the report opens. The 3D code is fetched while the person answers the questions, and the camera comes in while the lights turn on, so nothing waits before the first change.
 - Nothing is sent anywhere. The only network calls are for the page's own files.

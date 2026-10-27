@@ -4,3 +4,4 @@ data-raw/
 *.log
 .env
 .vercel
+video/

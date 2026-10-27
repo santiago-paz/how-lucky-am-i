@@ -1,7 +1,7 @@
 /* English copy. Plain words, short sentences, the plain hyphen only. */
 HLIA.i18n.add('en', {
-  'meta.title': 'How Lucky I Am',
-  'meta.description': 'Answer a few questions and see where you stand among the 8.2 billion people alive, using public data from the World Bank, the UN and others. Your answers never leave your browser.',
+  'meta.title': 'How Lucky Am I?',
+  'meta.description': 'Answer a few questions and see where you stand among the 8.3 billion people alive, using public data from the World Bank, the UN and others. Your answers never leave your browser.',
   'skip': 'Skip to the content',
   'lang.label': 'Language',
   'bar.restart': 'Start over',

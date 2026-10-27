@@ -376,8 +376,11 @@
     paintProgress(); paintNav();
     S.save();
     if (focus) {
-      const top = root.getBoundingClientRect().top + scrollY - 80;
-      scrollTo({ top: Math.max(0, top), behavior: HLIA.util.reducedMotion() ? 'auto' : 'smooth' });
+      const top = Math.max(0, root.getBoundingClientRect().top + scrollY - 80);
+      // A shorter step shrinks the page, and the browser then clamps the scroll to the footer. Gliding up
+      // from there would sweep the whole page past the eye, so a long way is a jump and a short way glides.
+      const near = Math.abs(top - scrollY) < innerHeight * 0.9;
+      scrollTo({ top, behavior: near && !HLIA.util.reducedMotion() ? 'smooth' : 'instant' });
       const h = cur.querySelector('h1');
       h && h.focus({ preventScroll: true });
     }
@@ -435,9 +438,18 @@
   }
 
   let renderedLang = null;
+  // The report opens on a 3D globe. Its code is fetched while the person answers, so nothing waits when the result comes.
+  let warmed = false;
+  function warmUp() {
+    if (warmed || !HLIA.results || !HLIA.results.load3d) return;
+    warmed = true;
+    const go = () => HLIA.results.load3d();
+    if ('requestIdleCallback' in global) requestIdleCallback(go, { timeout: 2500 }); else setTimeout(go, 1200);
+  }
   function open() {
     if (!stepsWrap.children.length || renderedLang !== i18n.lang) { render(); renderedLang = i18n.lang; }
     go(S.step, { focus: false });
+    warmUp();
   }
 
   HLIA.wizard = { init, render, open, go, next, update };

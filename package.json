@@ -1,5 +1,5 @@
 {
-  "name": "how-lucky-i-am",
+  "name": "how-lucky-am-i",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -11,11 +11,13 @@
     "build:map": "node scripts/build-map.mjs",
     "build:3d": "node scripts/build-3d.mjs",
     "build": "npm run build:data && npm run build:map && npm run build:3d",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "build:lottie": "node scripts/make-lottie.mjs"
   },
   "devDependencies": {
     "d3-geo": "^3.1.1",
     "esbuild": "^0.28.2",
+    "lottie-web": "^5.13.0",
     "three": "^0.186.1",
     "topojson-client": "^3.1.0",
     "topojson-simplify": "^3.0.3",

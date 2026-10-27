@@ -1,6 +1,6 @@
 # R3: Passports, visa-free travel and the right to live and work abroad
 
-Prepared 2026-10-27 for the "How Lucky I Am" project. SP = the scratch folder named in the brief.
+Prepared 2026-10-27 for the "How Lucky Am I?" project. SP = the scratch folder named in the brief.
 
 ## Status labels
 

@@ -4,14 +4,15 @@
      - the dots sit where people live (longitude and latitude from the build step)
      - a gold beacon marks you; a wave turns everyone behind you emerald, poorest first
      - the dots can lift off the globe into a "skyline" of towers, one tower per income step
-     - arcs can show where a passport opens doors
      - spinTo() turns the globe to a random person for the birth lottery
    Everything reads window.HLIA (people, model, GLOBE_DATA). Nothing is fetched. */
 import {
   WebGLRenderer, Scene, PerspectiveCamera, Group, SphereGeometry, BufferGeometry, BufferAttribute,
-  ShaderMaterial, Points, Mesh, LineSegments, CanvasTexture, Vector3, Quaternion, AdditiveBlending,
+  ShaderMaterial, Points, Mesh, CanvasTexture, Vector3, Quaternion, AdditiveBlending,
   BackSide, CylinderGeometry, RingGeometry, LinearMipmapLinearFilter, LinearFilter, MeshBasicMaterial, MathUtils,
 } from 'three';
+
+import './charts3d.js';
 
 const HLIA = window.HLIA;
 const TAU = Math.PI * 2;
@@ -97,19 +98,6 @@ void main() {
 }`;
 const ATMO_VS = `varying vec3 vN; void main(){ vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
 const ATMO_FS = `uniform vec3 uColor; uniform float uOpacity; varying vec3 vN; void main(){ float i = pow(max(0.0, 0.72 - dot(vN, vec3(0.0, 0.0, 1.0))), 3.2); gl_FragColor = vec4(uColor, 1.0) * i * uOpacity; }`;
-const ARC_VS = `
-attribute float aT; attribute float aSeed; attribute vec3 aCol;
-uniform float uTime, uShow;
-varying float vA; varying vec3 vC;
-void main() {
-  vC = aCol;
-  float head = fract(uTime * 0.2 + aSeed);
-  float d = head - aT; if (d < 0.0) d += 1.0;
-  float trail = exp(-d * 7.0);
-  vA = (0.16 + 0.84 * trail) * uShow * smoothstep(0.0, 0.06, aT) * smoothstep(1.0, 0.94, aT);
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}`;
-const ARC_FS = `varying float vA; varying vec3 vC; void main(){ gl_FragColor = vec4(vC, vA); }`;
 const BEAM_VS = `varying float vY; void main(){ vY = position.y; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
 const BEAM_FS = `uniform vec3 uColor; uniform float uOpacity; uniform float uLen; varying float vY; void main(){ float t = clamp(vY / uLen, 0.0, 1.0); gl_FragColor = vec4(uColor, pow(1.0 - t, 1.6) * uOpacity); }`;
 
@@ -129,6 +117,9 @@ export class Globe3D {
     this.dragging = false;
     this.lastTouch = 0;
     this.camTarget = new Vector3(0, 0, 0);
+    this.camLocks = 0; // how many camera moves are running (a getter below says whether any is)
+    this.camToken = 0; // changes when a newer camera move takes over from an older one
+    this.waveId = 0; // changes when a wave is skipped, so the one that was running stops where it is
     this.camDist = 5.2;
     this.visible = true;
     this.t0 = performance.now();
@@ -159,9 +150,8 @@ export class Globe3D {
     this.buildSphere();
     this.buildPoints();
     this.buildSkyline();
-    this.buildArcs();
     this.buildBeacon();
-    // Everything here is transparent, so draw order is set by hand: planet, glow, lights, arcs, beacons.
+    // Everything here is transparent, so draw order is set by hand: planet, glow, lights, beacons.
     this.sphere.renderOrder = 0;
     this.atmo.renderOrder = 1;
     this.points.renderOrder = 3;
@@ -286,62 +276,6 @@ export class Globe3D {
     };
   }
 
-  // ---------- arcs ----------
-  buildArcs() {
-    this.arcMat = new ShaderMaterial({
-      vertexShader: ARC_VS, fragmentShader: ARC_FS, transparent: true, depthWrite: false, blending: AdditiveBlending,
-      uniforms: { uTime: { value: 0 }, uShow: { value: 0 } },
-    });
-    this.arcs = null;
-  }
-  // list: [{ id: 'FRA', color: '#35d6a0' }, ...] from the user's home to each destination id
-  showArcs(fromId, list) {
-    this.clearArcs();
-    const cl = this.G.centLL;
-    const a0 = cl[fromId];
-    if (!a0) return;
-    const pos = [], aT = [], seed = [], col = [];
-    const A = lonLatToVec(a0[0], a0[1], 1);
-    const SEG = 44;
-    list.forEach((d, idx) => {
-      const c = cl[d.id];
-      if (!c || d.id === fromId) return;
-      const Bv = lonLatToVec(c[0], c[1], 1);
-      const ang = Math.acos(clamp(A.dot(Bv), -1, 1));
-      const h = 0.06 + 0.32 * Math.pow(ang / Math.PI, 0.9);
-      const sd = Math.random();
-      const rgb = hex(d.color);
-      let prev = null;
-      for (let k = 0; k <= SEG; k++) {
-        const t = k / SEG;
-        // spherical interpolation, lifted
-        const sinA = Math.sin(ang) || 1e-6;
-        const w1 = Math.sin((1 - t) * ang) / sinA, w2 = Math.sin(t * ang) / sinA;
-        const v = new Vector3(A.x * w1 + Bv.x * w2, A.y * w1 + Bv.y * w2, A.z * w1 + Bv.z * w2).normalize().multiplyScalar(1.005 + h * Math.sin(Math.PI * t));
-        if (prev) {
-          pos.push(prev.v.x, prev.v.y, prev.v.z, v.x, v.y, v.z);
-          aT.push(prev.t, t); seed.push(sd, sd);
-          col.push(...rgb, ...rgb);
-        }
-        prev = { v, t };
-      }
-    });
-    const geo = new BufferGeometry();
-    geo.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
-    geo.setAttribute('aT', new BufferAttribute(new Float32Array(aT), 1));
-    geo.setAttribute('aSeed', new BufferAttribute(new Float32Array(seed), 1));
-    geo.setAttribute('aCol', new BufferAttribute(new Float32Array(col), 3));
-    this.arcs = new LineSegments(geo, this.arcMat);
-    this.arcs.frustumCulled = false;
-    this.arcs.renderOrder = 4;
-    this.world.add(this.arcs);
-    this.tween(900, (e) => { this.arcMat.uniforms.uShow.value = e; });
-  }
-  clearArcs() {
-    if (this.arcs) { this.world.remove(this.arcs); this.arcs.geometry.dispose(); this.arcs = null; }
-    this.arcMat.uniforms.uShow.value = 0;
-  }
-
   // ---------- beacons (you, and a lottery pin) ----------
   makeBeacon(color) {
     const g = new Group();
@@ -378,7 +312,7 @@ export class Globe3D {
     const c = this.canvas;
     c.style.touchAction = 'pan-y';
     let lx = 0, ly = 0, moved = 0;
-    this.onDown = (e) => { this.dragging = true; moved = 0; lx = e.clientX; ly = e.clientY; c.setPointerCapture(e.pointerId); this.rot.vy = 0; };
+    this.onDown = (e) => { this.dragging = true; moved = 0; lx = e.clientX; ly = e.clientY; try { c.setPointerCapture(e.pointerId); } catch (err) { /* not an active pointer */ } this.rot.vy = 0; };
     this.onMove = (e) => {
       if (this.dragging) {
         const dx = e.clientX - lx, dy = e.clientY - ly;
@@ -451,17 +385,28 @@ export class Globe3D {
   // Pull the camera back far enough that the globe (or the skyline) fits the frame.
   fitCamera() {
     const fv = FOV * D2R, fh = 2 * Math.atan(Math.tan(fv / 2) * this.camera.aspect);
-    const globe = 1.18 / Math.sin(Math.min(fv, fh) / 2);
-    const shifted = this.shiftCfg && Math.abs(this.shiftCfg.sky) > 0.01;
+    // opts.shift may also say how much of the width is free beside a text card (globeW, skyW, as shares of the
+    // width). The globe is fitted to its strip, so the whole planet and its glow stay clear of the card.
+    const cfg = this.shiftCfg || {};
+    const stripAspect = cfg.globeW ? Math.min(this.camera.aspect, (cfg.globeW * this.w) / this.h) : this.camera.aspect;
+    const fhGlobe = 2 * Math.atan(Math.tan(fv / 2) * stripAspect);
+    const globe = 1.18 / Math.sin(Math.min(fv, fhGlobe) / 2);
     // the skyline must fit across and up: width of the towers, and the height of the tallest one
     const skyH = this.sky.topMax - this.sky.baseY + 0.45; // room for the beacon and a margin
-    // when a card takes the other side, the skyline gets about 55% of the width
-    const distW = shifted ? (this.sky.width + 0.5) / 0.55 / (2 * Math.tan(fh / 2)) + 0.4 : (this.sky.width / 2 + 0.3) / Math.tan(fh / 2) + 0.6;
-    const distH = skyH / 2 / Math.tan(fv / 2) + 0.6;
-    this.skyCenterY = this.sky.baseY + (this.sky.topMax - this.sky.baseY) / 2 + 0.05;
-    this.fit = { globe: globe * 1.02, sky: Math.max(distW, distH, 3.4) };
+    const share = cfg.skyW ? MathUtils.clamp(cfg.skyW, 0.25, 0.9) : Math.abs(cfg.sky || 0) > 0.01 ? 0.55 : 0;
+    const distW = share ? (this.sky.width + 0.5) / share / (2 * Math.tan(fh / 2)) + 0.4 : (this.sky.width / 2 + 0.3) / Math.tan(fh / 2) + 0.6;
+    // the axis labels (dollar ticks, world median, axis title) hang below the base, about 80px of the stage
+    const reserve = Math.min(0.3, 80 / this.h);
+    const distH = skyH / (2 * Math.tan(fv / 2) * (1 - reserve)) + 0.6;
+    const skyDist = Math.max(distW, distH, 3.4);
+    // look at the middle of what is left once the label rows are taken off the bottom
+    this.skyCenterY = this.sky.baseY + (this.sky.topMax - this.sky.baseY) / 2 + 0.05 - reserve * skyDist * Math.tan(fv / 2);
+    this.fit = { globe: globe * 1.02, sky: skyDist };
     if (!this.camTween) this.camDist = this.mode === 'skyline' ? this.fit.sky : this.fit.globe;
   }
+
+  get camTween() { return this.camLocks > 0; }
+  lockCam(on) { this.camLocks = Math.max(0, this.camLocks + (on ? 1 : -1)); }
 
   // ---------- animation helpers ----------
   tween(ms, fn, easing = ease.outCubic) {
@@ -509,23 +454,27 @@ export class Globe3D {
   }
   // Opening move: start far and face the user's country.
   async flyIn(ms = 2600) {
-    const d1 = this.fit.globe, d0 = d1 * 2.3;
-    this.camTween = true;
+    const d0 = this.fit.globe * 2.3;
+    const token = ++this.camToken;
+    this.lockCam(true);
     const home = this.youLL || [0, 20];
     const f = this.faceTo(home[0], home[1] * 0.8);
     this.rot.y = f.y + 1.6; this.rot.x = 0.1;
     this.camDist = d0;
     const y0 = this.rot.y, x0 = this.rot.x;
     await this.tween(ms, (e) => {
-      this.camDist = d0 + (d1 - d0) * ease.outExpo(e);
+      // the end point follows the current mode (a reload can start the page already scrolled to the skyline)
+      const d1 = this.mode === 'skyline' ? this.fit.sky : this.fit.globe;
+      if (token === this.camToken) this.camDist = d0 + (d1 - d0) * ease.outExpo(e);
       this.rot.y = y0 + (f.y - y0) * e;
       this.rot.x = x0 + (f.x * 0.8 - x0) * e;
     }, (t) => ease.inOutSine(t));
-    this.camTween = false;
+    this.lockCam(false);
   }
   // Turn the lights behind you emerald, poorest first. onProgress(share 0..1 of all people lit).
   async wave(ms = 3600, onProgress) {
     if (!this.user) return;
+    const id = ++this.waveId;
     const target = this.P.countBelow(this.user.z) / this.P.n;
     const u = this.pointsMat.uniforms;
     u.uAhead.value = 0;
@@ -534,8 +483,16 @@ export class Globe3D {
       u.uWave.value = e * Math.max(target, 0.001) * 1.0001;
       if (onProgress) onProgress(e * target, e);
     }, ease.inOutSine);
+    if (id !== this.waveId) return; // skipped: the lights are already all on
     u.uWave.value = 1.01;
-    await this.tween(900, (e) => { u.uAhead.value = e; });
+    await this.tween(900, (e) => { if (id === this.waveId) u.uAhead.value = e; });
+  }
+  // Skip: every move that is running jumps to its end (the camera too), and a wave on its way is over at once.
+  finishAll() {
+    this.waveId++;
+    const running = this.tweens.splice(0);
+    for (const t of running) { t.fn(t.easing(1)); t.resolve(); }
+    this.setWaveInstant();
   }
   setWaveInstant() { if (this.user) { this.pointsMat.uniforms.uWave.value = 1.01; this.pointsMat.uniforms.uAhead.value = 1; } }
 
@@ -546,18 +503,18 @@ export class Globe3D {
     const d0 = this.camDist, d1 = mode === 'skyline' ? this.fit.sky : this.fit.globe;
     const ty0 = this.camTarget.y, ty1 = mode === 'skyline' ? this.skyCenterY : 0;
     this.mode = mode;
-    this.camTween = true;
+    const token = ++this.camToken;
+    this.lockCam(true);
     const fadeTo = mode === 'skyline' ? 0 : 1;
     const o0 = this.sphereMat.uniforms.uOpacity.value;
     await this.tween(ms, (e) => {
       this.mix = from + (to - from) * e;
       this.pointsMat.uniforms.uMix.value = this.mix;
-      this.camDist = d0 + (d1 - d0) * e;
-      this.camTarget.y = ty0 + (ty1 - ty0) * e;
+      if (token === this.camToken) { this.camDist = d0 + (d1 - d0) * e; this.camTarget.y = ty0 + (ty1 - ty0) * e; }
       const sOp = o0 + (fadeTo - o0) * clamp(mode === 'skyline' ? e * 2.2 : (e - 0.35) / 0.65, 0, 1);
       this.setPlanetOpacity(sOp);
     }, ease.inOutCubic);
-    this.camTween = false;
+    this.lockCam(false);
     this.skyYaw = this.skyYaw || 0;
     this.grid = null;
   }
@@ -582,7 +539,7 @@ export class Globe3D {
     dy -= TAU * turns;
     // ease in a little toward the pin, but keep the whole planet and its glow inside the frame
     const d0 = this.camDist, d1 = this.fit.globe * 0.92;
-    this.camTween = true;
+    this.lockCam(true);
     await this.tween(ms, (e) => {
       this.rot.y = y0 + dy * e; this.rot.x = x0 + (f.x - x0) * e;
       this.camDist = d0 + (d1 - d0) * ease.outCubic(e);
@@ -590,7 +547,7 @@ export class Globe3D {
     this.placeBeacon(this.pinBeacon, lon, lat);
     this.pinBeacon.userData.t0 = performance.now();
     await this.tween(700, (e) => { this.pinBeacon.scale.setScalar(0.2 + 0.8 * ease.outExpo(e)); }, (t) => t);
-    this.camTween = false;
+    this.lockCam(false);
   }
   releasePin() { this.pinBeacon.visible = false; this.camDist = this.fit.globe; }
 
@@ -673,7 +630,6 @@ export class Globe3D {
     this.camera.position.set(this.camTarget.x, this.camTarget.y + this.mix * 0.35, this.camDist);
     this.camera.lookAt(this.camTarget);
     this.pointsMat.uniforms.uTime.value = t;
-    this.arcMat.uniforms.uTime.value = t;
     this.applyShift();
     // pulse the rings
     for (const b of [this.youBeacon, this.pinBeacon, this.skyBeacon]) {
