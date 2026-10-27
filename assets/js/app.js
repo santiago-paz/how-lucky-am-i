@@ -16,10 +16,14 @@
   function paintLang() {
     $$('[data-lang]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === i18n.lang)));
   }
+  // who made it, and where the code is
+  const LINKEDIN = 'https://www.linkedin.com/in/santiago-paz', REPO = 'https://github.com/santiago-paz/how-lucky-am-i';
   function paintFooter() {
+    const out = (href, text) => el('a', { href, target: '_blank', rel: 'noopener noreferrer' }, text);
     $('#foot').replaceChildren(
       el('p', null, t('foot.privacy')),
       el('p', null, t('foot.data')),
+      el('p', { class: 'foot-links' }, el('span', null, t('foot.by')), out(LINKEDIN, 'LinkedIn'), out(REPO, t('foot.repo'))),
     );
   }
 

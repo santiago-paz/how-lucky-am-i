@@ -18,6 +18,7 @@ HLIA.i18n.add('es', {
   'restart.confirm': '¿Borrar tus respuestas y empezar de nuevo?',
   'foot.privacy': 'Todo funciona en tu navegador. Tus respuestas no se envían a ningún lado y se olvidan cuando cierras la pestaña.',
   'foot.data': 'Es un retrato aproximado hecho con datos públicos, no una medida del valor de nadie. Deja afuera el amor, los amigos y el sentido de la vida, que ninguna encuesta cuenta bien.',
+  'foot.by': 'Hecho por Santiago Paz', 'foot.repo': 'Código en GitHub',
 
   'intro.title': '¿Dónde estás entre {pop} personas?',
   'intro.lede': 'Responde unas preguntas sobre tu vida. Te comparamos con todas las personas que viven hoy, con datos públicos del Banco Mundial, las Naciones Unidas y otras fuentes.',

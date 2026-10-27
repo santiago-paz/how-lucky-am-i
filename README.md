@@ -111,7 +111,7 @@ The site works with a keyboard and a screen reader. The pyramid, the eight bars,
 
 ## Licences
 
-The project has no licence file yet. Add one before you publish it.
+The project has no licence file yet, so by default all rights are reserved: people can read the code but not reuse it. Add a licence file if you want to allow reuse.
 
 Third-party material keeps its own terms:
 

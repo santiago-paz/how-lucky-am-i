@@ -18,6 +18,7 @@ HLIA.i18n.add('en', {
   'restart.confirm': 'Clear your answers and start over?',
   'foot.privacy': 'Everything runs in your browser. Your answers are never sent anywhere, and they are forgotten when you close the tab.',
   'foot.data': 'This is a rough picture built from public data, not a measure of anyone\'s worth. It leaves out love, friends and purpose, which no survey counts well.',
+  'foot.by': 'Made by Santiago Paz', 'foot.repo': 'Source code on GitHub',
 
   // intro
   'intro.title': 'Where do you stand among {pop} people?',
