@@ -76,7 +76,7 @@ npm run deploy -- --stage-only               # only build .deploy/, to look at w
 
 ## Link preview
 
-When the link is shared (LinkedIn, WhatsApp, Slack, X), the picture comes from `assets/og/og-image.jpg`, 1200 by 630 pixels. It is drawn by `scripts/og-card.html` from the same map of people the site uses. To make it again: run `npm run dev`, open http://localhost:5173/scripts/og-card.html in a 1200 by 630 window at a device pixel ratio of 2, save a screenshot, and shrink it to 1200 by 630 as a JPEG (`ffmpeg -i shot.png -vf scale=1200:630 -q:v 2 assets/og/og-image.jpg`). The full web addresses in the `og:` tags of `index.html` must match the site's address. LinkedIn keeps a copy of each link for a while: to see a change at once, paste the link into https://www.linkedin.com/post-inspector/.
+When the link is shared (LinkedIn, WhatsApp, Slack, X), the picture comes from `assets/og/og-image.jpg`, 1200 by 630 pixels. It is drawn by `scripts/og-card.html` from the same map of people the site uses. To make it again: run `npm run dev`, open http://localhost:5173/scripts/og-card.html in a 1200 by 630 window at a device pixel ratio of 2, save a screenshot, and shrink it to 1200 by 630 as a JPEG (`ffmpeg -i shot.png -vf scale=1200:630 -q:v 2 assets/og/og-image.jpg`). The full web addresses in the `og:` tags and the canonical link of `index.html` must match the site's address. The same address is written in `SITE` in `assets/js/share.js` (the share card and the shared text carry it) and in `homepage` in `package.json`. LinkedIn keeps a copy of each link for a while: to see a change at once, paste the link into https://www.linkedin.com/post-inspector/.
 
 ## Project layout
 

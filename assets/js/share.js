@@ -9,11 +9,12 @@
   const model = HLIA.model;
   const W = 1080, H = 1350;
 
-  // The address of the site, for the card and the shared text. A local test address (localhost) means nothing to
-  // the people who see the card, so it is left out.
-  const LOCAL_HOST = /^(localhost|127(\.\d+){3}|10(\.\d+){3}|192\.168(\.\d+){2}|172\.(1[6-9]|2\d|3[01])(\.\d+){2}|\[::1\]|[^.]+|.*\.local)$/i;
-  const publicHost = () => (/^https?:$/.test(location.protocol) && !LOCAL_HOST.test(location.hostname) ? location.host : '');
-  const publicOrigin = () => (publicHost() ? location.origin : '');
+  // The address of the site. The card and the shared text always carry it, wherever the page is opened from
+  // (a test address means nothing to the people who see the card). The same address is written in index.html
+  // (the link preview and the canonical link) and in package.json: change all three together.
+  const SITE = 'https://how-lucky-am-i.vercel.app';
+  const publicOrigin = () => SITE;
+  const publicHost = () => SITE.replace(/^https?:\/\//, '');
 
   function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
 
@@ -138,14 +139,14 @@
       ctx.textAlign = 'left';
     }
 
-    // footer: a thin line, the question, and the address if the site has a public one
+    // footer: a thin line, the question on the left and the address on the right
     ctx.strokeStyle = hair; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(M, LAY.rule); ctx.lineTo(RIGHT, LAY.rule); ctx.stroke();
     const host = publicHost();
-    let askMax = RIGHT - M;
-    if (host) { ctx.font = `500 30px ${F}`; askMax -= ctx.measureText(host).width + 40; }
-    const ask = fitText(ctx, t('s.card.ask'), 700, 46, 30, askMax, F);
+    ctx.font = `650 32px ${F}`;
+    const hostW = ctx.measureText(host).width;
+    const ask = fitText(ctx, t('s.card.ask'), 700, 46, 30, RIGHT - M - hostW - 40, F);
     ctx.fillStyle = ink; ctx.font = `700 ${ask.size}px ${F}`; ctx.fillText(ask.text, M, LAY.footer);
-    if (host) { ctx.textAlign = 'right'; ctx.fillStyle = ink2; ctx.font = `500 30px ${F}`; ctx.fillText(host, RIGHT, LAY.footer); ctx.textAlign = 'left'; }
+    ctx.textAlign = 'right'; ctx.fillStyle = ink; ctx.font = `650 32px ${F}`; ctx.fillText(host, RIGHT, LAY.footer); ctx.textAlign = 'left';
   }
 
   function section(R) {
@@ -160,7 +161,7 @@
     };
     const text = t('s.text', { pct: HLIA.util.topLabel(R.overall.ahead), pop: i18n.people(HLIA.DATA.meta.pipPop) });
     const blob = () => new Promise((res) => canvas.toBlob(res, 'image/png'));
-    const copy = el('button', { type: 'button', class: 'btn btn-ghost', onclick: async () => { try { await navigator.clipboard.writeText(text + (publicOrigin() ? ' ' + publicOrigin() : '')); copy.textContent = t('s.copied'); setTimeout(() => { copy.textContent = t('s.copy'); }, 1600); } catch (e) { /* clipboard blocked */ } } }, t('s.copy'));
+    const copy = el('button', { type: 'button', class: 'btn btn-ghost', onclick: async () => { try { await navigator.clipboard.writeText(text + ' ' + publicOrigin()); copy.textContent = t('s.copied'); setTimeout(() => { copy.textContent = t('s.copy'); }, 1600); } catch (e) { /* clipboard blocked */ } } }, t('s.copy'));
     const save = async () => { const b = await blob(); const a = el('a', { href: URL.createObjectURL(b), download: 'how-lucky-am-i.png' }); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
     const dl = el('button', { type: 'button', class: 'btn btn-ghost', onclick: save }, HLIA.ui.icon('download'), ' ', t('s.download'));
     const shareBtn = el('button', { type: 'button', class: 'btn btn-primary', onclick: async () => {
@@ -168,7 +169,7 @@
       const file = new File([b], 'how-lucky-am-i.png', { type: 'image/png' });
       try {
         if (navigator.canShare && navigator.canShare({ files: [file] })) await navigator.share({ files: [file], text });
-        else if (navigator.share) await navigator.share(publicOrigin() ? { text, url: publicOrigin() } : { text });
+        else if (navigator.share) await navigator.share({ text, url: publicOrigin() });
         else await save();
       } catch (e) { /* the person closed the share sheet */ }
     } }, HLIA.ui.icon('share'), ' ', t('s.share'));
