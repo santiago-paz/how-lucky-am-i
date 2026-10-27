@@ -59,6 +59,19 @@ npm test             # 15 tests
 
 `npm run build` runs the data, map and 3D steps in order. The Lottie files are plain JSON made by `scripts/make-lottie.mjs`, so you only run that step when you change an animation. Curated inputs that no API serves are in `data/curated/`: the UBS tables and the treaty list.
 
+## Put it online
+
+The site is plain files, so any static host works. For Vercel, this repo has a small script. It uploads only `index.html` and `assets/` (not the notes, scripts, tests or raw data).
+
+```bash
+vercel link --yes --project how-lucky-am-i   # once, to tie this folder to a Vercel project
+npm run deploy                               # a production deploy
+npm run deploy -- --preview                  # a preview deploy
+npm run deploy -- --stage-only               # only build .deploy/, to look at what would go up
+```
+
+`vercel.json` holds the headers (long caching for the fonts, and two safe defaults for every file).
+
 ## Project layout
 
 ```
@@ -70,7 +83,7 @@ assets/js/vendor/     the lottie-web player, with its licence
 assets/lottie/        the Lottie animations
 assets/src/           source of the 3D bundle (the globe, and the pyramid and tower charts)
 assets/fonts/         Mona Sans and Newsreader, with their licences
-scripts/              fetch and build scripts
+scripts/              fetch, build and deploy scripts
 data/curated/         hand-checked inputs
 research/             research notes with sources
 docs/design.md        the design plan
