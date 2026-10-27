@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Link preview card</title>
+  <!-- Draws the picture that shows when the site's link is shared (assets/og/og-image.jpg), 1200 by 630.
+       It reuses the site's own map of people, so the picture is the same one the visitor meets on the page.
+       To make it again: serve the folder (npm run dev), open this page at a 1200 by 630 window with a device
+       pixel ratio of 2, save a screenshot, and shrink it to 1200 by 630 (see "Link preview" in the README). -->
+  <link rel="stylesheet" href="../assets/css/tokens.css">
+  <style>
+    html, body { margin: 0; background: var(--bg); }
+    .card { position: relative; width: 1200px; height: 630px; overflow: hidden; background: var(--bg); isolation: isolate; font-family: var(--font-ui); color: var(--ink); }
+    /* the map is pushed 90 px to the right, so Europe, Africa and Asia fill the open side and the Americas sit under the words */
+    .card canvas { position: absolute; inset: 0; z-index: -2; transform: translateX(90px); }
+    /* a veil from the left, as wide as the words, so the map stays calm behind them */
+    .card::before {
+      content: ""; position: absolute; inset: 0; z-index: -1;
+      background:
+        linear-gradient(90deg, color-mix(in srgb, var(--bg) 90%, transparent) 0%, color-mix(in srgb, var(--bg) 78%, transparent) 38%, color-mix(in srgb, var(--bg) 30%, transparent) 54%, transparent 64%),
+        linear-gradient(to top, var(--bg) 0%, color-mix(in srgb, var(--bg) 70%, transparent) 14%, transparent 34%);
+    }
+    .name { position: absolute; left: 72px; top: 56px; font-size: 38px; font-weight: 750; font-stretch: 92%; letter-spacing: -0.02em; white-space: nowrap; }
+    .name i { font-style: normal; color: var(--you); }
+    h1 { position: absolute; left: 70px; top: 116px; margin: 0; font-size: 94px; font-weight: 780; font-stretch: 86%; line-height: 0.98; letter-spacing: -0.035em; text-shadow: 0 0 22px var(--bg), 0 0 8px var(--bg); }
+    .fine { position: absolute; left: 72px; bottom: 46px; margin: 0; font-size: 25px; font-weight: 500; white-space: nowrap; color: var(--ink-2); }
+    /* you: one gold light with a ring, on the map */
+    .you { position: absolute; width: 0; height: 0; z-index: 1; }
+    .you::before { content: ""; position: absolute; left: -11px; top: -11px; width: 22px; height: 22px; border-radius: 50%; background: var(--you); box-shadow: 0 0 26px 8px color-mix(in srgb, var(--you) 55%, transparent); }
+    .you::after { content: ""; position: absolute; left: -29px; top: -29px; width: 58px; height: 58px; border-radius: 50%; border: 3px solid color-mix(in srgb, var(--you) 70%, transparent); }
+  </style>
+</head>
+<body>
+  <div class="card" id="card">
+    <canvas id="map"></canvas>
+    <div class="name" translate="no">How Lucky Am <i>I</i>?</div>
+    <h1>Where do you<br>stand among<br>8.3 billion<br>people?</h1>
+    <p class="fine">Takes about five minutes. Your answers never leave this browser.</p>
+    <div class="you" id="you"></div>
+  </div>
+
+  <script src="../assets/js/data/world.js"></script>
+  <script src="../assets/js/data/passports.js"></script>
+  <script src="../assets/js/data/map.js"></script>
+  <script src="../assets/js/util.js"></script>
+  <script src="../assets/js/i18n.js"></script>
+  <script src="../assets/js/i18n.en.js"></script>
+  <script src="../assets/js/i18n.es.js"></script>
+  <script src="../assets/js/i18n.results.en.js"></script>
+  <script src="../assets/js/i18n.results.es.js"></script>
+  <script src="../assets/js/sources.js"></script>
+  <script src="../assets/js/model.js"></script>
+  <script src="../assets/js/people.js"></script>
+  <script src="../assets/js/field.js"></script>
+  <script>
+    (async () => {
+      const HLIA = window.HLIA;
+      await document.fonts.load('780 100px "Mona Sans"');
+      await document.fonts.load('750 40px "Mona Sans"');
+      await document.fonts.ready;
+      const canvas = document.getElementById('map');
+      const card = document.getElementById('card');
+      const field = new HLIA.DotField(canvas, { mode: 'map', glow: true, twinkle: false, interactive: false, mapFit: 'width', mapAnchor: 0.5 });
+      // lights behind the viewer turn emerald, the rest stay violet; the viewer is the gold one
+      field.setUser({ z: 30, id: 'DEU' });
+      field.setColorBy('split');
+      field.render();
+      // put the gold light on Germany
+      const c = HLIA.MAP.cent.DEU, vb = HLIA.people.vb, m = field.map;
+      const you = document.getElementById('you');
+      you.style.left = (90 + m.ox + (c[0] - vb[0]) * m.s) + 'px'; // 90 px: the same push to the right as the map
+      you.style.top = (m.oy + (c[1] - vb[1]) * m.s) + 'px';
+      document.title = 'ready';
+      window.ogReady = true;
+    })();
+  </script>
+</body>
+</html>

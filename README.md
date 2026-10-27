@@ -74,6 +74,10 @@ npm run deploy -- --stage-only               # only build .deploy/, to look at w
 
 `vercel.json` holds the headers (long caching for the fonts, and two safe defaults for every file).
 
+## Link preview
+
+When the link is shared (LinkedIn, WhatsApp, Slack, X), the picture comes from `assets/og/og-image.jpg`, 1200 by 630 pixels. It is drawn by `scripts/og-card.html` from the same map of people the site uses. To make it again: run `npm run dev`, open http://localhost:5173/scripts/og-card.html in a 1200 by 630 window at a device pixel ratio of 2, save a screenshot, and shrink it to 1200 by 630 as a JPEG (`ffmpeg -i shot.png -vf scale=1200:630 -q:v 2 assets/og/og-image.jpg`). The full web addresses in the `og:` tags of `index.html` must match the site's address. LinkedIn keeps a copy of each link for a while: to see a change at once, paste the link into https://www.linkedin.com/post-inspector/.
+
 ## Project layout
 
 ```
@@ -85,7 +89,7 @@ assets/js/vendor/     the lottie-web player, with its licence
 assets/lottie/        the Lottie animations
 assets/src/           source of the 3D bundle (the globe, and the pyramid and tower charts)
 assets/fonts/         Mona Sans and Newsreader, with their licences
-scripts/              fetch, build and deploy scripts
+scripts/              fetch, build and deploy scripts, and the link preview card
 data/curated/         hand-checked inputs
 research/             research notes with sources
 docs/design.md        the design plan
