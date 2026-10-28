@@ -16,13 +16,13 @@
     pipLines: {
       name: 'The World Bank\'s new global poverty lines in 2021 prices', by: 'World Bank Data Blog', when: '9 June 2025',
       url: 'https://blogs.worldbank.org/en/opendata/the-world-bank-s-new-global-poverty-lines-in-2021-prices', status: 'secondary',
-      en: 'The $3.00, $4.20 and $8.30 lines a day (2021 PPP dollars).', es: 'Las líneas de US$ 3,00, 4,20 y 8,30 por día (dólares PPA de 2021).',
+      en: 'The $3.00, $4.20 and $8.30 lines a day (2021 PPP dollars).', es: 'Las líneas de US$\u00A03,00, 4,20 y 8,30 por día (dólares PPA de 2021).',
     },
     gwwc: {
       name: 'How Rich Am I? (percentiles from PIP via Our World in Data)', by: 'Giving What We Can', when: '2025 page, 2024 data',
       url: 'https://www.givingwhatwecan.org/how-rich-am-i', status: 'checked',
       en: 'A cross-check. Its top 1% starts at $162.6 a day; ours, from the same PIP data, starts near $165 a day.',
-      es: 'Una comprobación cruzada. Su 1% más alto empieza en US$ 162,6 al día; el nuestro, con los mismos datos de PIP, cerca de US$ 165 al día.',
+      es: 'Una comprobación cruzada. Su 1% más alto empieza en US$\u00A0162,6 al día; el nuestro, con los mismos datos de PIP, cerca de US$\u00A0165 al día.',
     },
     wir: {
       name: 'World Inequality Report 2026', by: 'World Inequality Lab (WID.world)', when: '2026, data for 2025',

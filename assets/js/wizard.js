@@ -13,8 +13,10 @@
   const refs = {};
   let root, stepsWrap, progressEl, navBack, navNext, hudEl;
   let hudShown = null; // the number the live estimate currently shows
+  let hudLower = null; // which wording it uses now: "ahead of X%" (true) or "top X%" (false)
   let hudTween = null;
   let hudSay;
+  let askEl = null; // the question under the home list while it is open (see askBasics)
 
   // text with {name} slots filled by nodes or strings
   function node(key, vars) {
@@ -34,14 +36,21 @@
   }
 
   // ---------- form helpers ----------
-  function block({ label, hint, control, id, legend, optional }) {
+  // Whole sentences, so a narrow screen breaks a short note between them and never inside one.
+  const sentences = (s) => (s.match(/[^.!?]+[.!?]*/g) || [s]).map((x) => x.trim());
+  function block({ label, hint, control, id, legend, optional, priv }) {
     const hintEl = hint ? el('p', { class: 'hint', id: id + '-hint' }, hint) : null;
+    // priv: the reassurance under a question that feels personal, a small lock and one line
+    const privEl = priv ? el('p', { class: 'hint hint-private', id: id + '-priv' }, ui.icon('lock'), el('span', null, ...sentences(priv).flatMap((s, i) => [i ? ' ' : null, el('span', { class: 'sent' }, s)]))) : null;
+    const described = [hintEl && id + '-hint', privEl && id + '-priv'].filter(Boolean).join(' ') || null;
     const err = el('p', { class: 'err', id: id + '-err', role: 'alert' });
     const text = optional ? [label, el('span', { class: 'opt' }, ' ' + t('optional'))] : label;
     const head = legend ? el('legend', { class: 'field-label' }, text) : el('label', { class: 'field-label', for: id }, text);
     const wrap = legend
-      ? el('fieldset', { class: 'field fieldset', 'aria-describedby': hint ? id + '-hint' : null }, head, hintEl, control, err)
-      : el('div', { class: 'field' }, head, hintEl, control, err);
+      ? el('fieldset', { class: 'field fieldset', 'aria-describedby': described }, head, hintEl, privEl, control, err)
+      : el('div', { class: 'field' }, head, hintEl, privEl, control, err);
+    // a plain field points its input at the hint and the note (the money input's own pointer named an id that does not exist)
+    if (privEl && !legend) { const input = wrap.querySelector('[id="' + id + '"]'); input && input.setAttribute('aria-describedby', described); }
     wrap.setError = (msg) => { err.textContent = msg || ''; wrap.classList.toggle('bad', !!msg); };
     return wrap;
   }
@@ -71,6 +80,7 @@
       id: 'f-residence', options: opts, value: a.residence, placeholder: t('q.residence.ph'), label: t('q.residence'),
       onChange(id) {
         a.residence = id;
+        S.residenceTouched = true; // picked from the list, even if it is the same country: no longer only the browser's guess
         if (!S.passportsTouched) { a.passports = S.birthId() ? [S.birthId()] : []; refs.passports.set(a.passports); }
         refs.income && refs.income.refresh();
         update();
@@ -101,7 +111,7 @@
     refs.passportsBlock = block({ id: 'f-passports', label: t('q.passports'), hint: t('q.passports.hint'), control: refs.passports });
 
     refs.statusBlock = block({
-      id: 'f-status', legend: true, label: t('q.status'),
+      id: 'f-status', legend: true, label: t('q.status'), priv: t('q.private'),
       control: ui.choices({ name: 'status', options: optionsFor('q.status', ['citizen', 'permanent', 'temporary', 'insecure']), value: a.status, onChange(v) { a.status = v; update(); } }),
     });
 
@@ -139,7 +149,7 @@
         update();
       },
     });
-    refs.incomeBlock = block({ id: 'inc-amount', label: t('q.income'), hint: t('q.income.hint'), control: refs.income });
+    refs.incomeBlock = block({ id: 'inc-amount', label: t('q.income'), hint: t('q.income.hint'), priv: t('q.private'), control: refs.income });
 
     const hhWrap = el('div', { class: 'hh' });
     refs.hhInput = el('input', { class: 'input input-num', id: 'hh-total', type: 'text', inputmode: 'decimal', autocomplete: 'off' });
@@ -158,7 +168,7 @@
     const shared = sw({ id: 'f-shared', label: t('q.shared'), checked: a.household.shared, onChange(v) { a.household.shared = v; hhWrap.hidden = !v; update(); } });
     const sharedHint = el('p', { class: 'hint', style: { marginTop: '-0.4rem' } }, t('q.shared.hint'));
 
-    return [refs.workBlock, refs.incomeBlock, shared, sharedHint, hhWrap, el('div', { class: 'reads-wrap' }, el('h3', { class: 'reads-title' }, t('reads.title')), refs.reads)];
+    return [refs.workBlock, refs.incomeBlock, shared, sharedHint, hhWrap, el('div', { class: 'reads-wrap' }, el('h2', { class: 'reads-title' }, t('reads.title')), refs.reads)];
   }
 
   function worthRange(key) {
@@ -189,16 +199,16 @@
       update();
     }, 'aria-pressed': String(!!a.netWorth.skip) }, t('q.worth.skip'));
     refs.worth = ui.choices({ name: 'worth', options: worthOpts, value: a.netWorth.bracket, onChange(v) { a.netWorth = { bracket: v, skip: false }; skip.setAttribute('aria-pressed', 'false'); update(); } });
-    refs.worthBlock = block({ id: 'f-worth', legend: true, label: t('q.worth'), hint: t('q.worth.hint'), control: el('div', { class: 'stack' }, refs.worth, skip), optional: true });
+    refs.worthBlock = block({ id: 'f-worth', legend: true, label: t('q.worth'), hint: t('q.worth.hint'), priv: t('q.private'), control: el('div', { class: 'stack' }, refs.worth, skip), optional: true });
 
     const items = [['water', 'water'], ['toilet', 'toilet'], ['power', 'power'], ['cooking', 'cooking'], ['internet', 'internet'], ['food', 'food']];
     refs.basics = ui.toggles({
       options: items.map(([k, ic]) => ({ key: k, icon: ic, label: t(`basic.${k}`), desc: t(`basic.${k}.d`) })),
       values: a.basics,
-      onChange(k, v) { a.basics[k] = v; S.basicsTouched = true; update(); },
+      onChange(k, v) { a.basics[k] = v; touchBasics(); update(); },
     });
-    const all = el('button', { type: 'button', class: 'btn btn-quiet', onclick() { Object.keys(a.basics).forEach((k) => { a.basics[k] = true; }); refs.basics.setAll(true); S.basicsTouched = true; update(); } }, t('q.basics.all'));
-    const none = el('button', { type: 'button', class: 'btn btn-quiet', onclick() { Object.keys(a.basics).forEach((k) => { a.basics[k] = false; }); refs.basics.setAll(false); S.basicsTouched = true; update(); } }, t('q.basics.none'));
+    const all = el('button', { type: 'button', class: 'btn btn-quiet', onclick() { Object.keys(a.basics).forEach((k) => { a.basics[k] = true; }); refs.basics.setAll(true); touchBasics(); update(); } }, t('q.basics.all'));
+    const none = el('button', { type: 'button', class: 'btn btn-quiet', onclick() { Object.keys(a.basics).forEach((k) => { a.basics[k] = false; }); refs.basics.setAll(false); touchBasics(); update(); } }, t('q.basics.none'));
     refs.basicsBlock = block({ id: 'f-basics', legend: true, label: t('q.basics'), hint: t('q.basics.hint'), control: el('div', { class: 'stack' }, el('div', { class: 'row-tools' }, all, none), refs.basics) });
 
     return [refs.tenureBlock, refs.savingsBlock, refs.worthBlock, refs.basicsBlock];
@@ -263,40 +273,59 @@
   }
 
   function paintCrowd(pct) {
-    const k = clamp(Math.round(pct * 100), 0, 99);
     const dots = hudEl.crowd.children;
+    // nobody is placed yet: a plain crowd with no gold one, so it never reads as "you are the very first"
+    if (pct < 0) { for (let i = 0; i < 100; i++) dots[i].className = ''; return; }
+    const k = clamp(Math.round(pct * 100), 0, 99);
     for (let i = 0; i < 100; i++) dots[i].className = i < k ? 'b' : i === k ? 'y' : 'a';
   }
+  // one decimal under 10, none above, and never "100": a place short of everyone is not the whole world
+  const pctText = (v) => (v >= 99.5 ? '99.9' : v < 10 ? fmt.dec(v, 1) : fmt.int(Math.round(v)));
   function showNumber(target) {
     const pctEl = hudEl.num.querySelector('.hud-pct');
-    if (hudShown == null) { pctEl.textContent = fmt.dec(target, target < 10 ? 1 : 0); hudShown = target; return; }
-    if (hudTween) hudTween.cancel();
+    if (hudTween) hudTween.cancel(); // a count still running toward the old number must not overwrite the new one
+    if (hudShown == null) { pctEl.textContent = pctText(target); hudShown = target; return; }
     const from = hudShown;
     hudTween = tween(500, (e) => {
       const v = from + (target - from) * e;
-      pctEl.textContent = v < 10 ? fmt.dec(v, 1) : fmt.int(Math.round(v));
+      pctEl.textContent = pctText(v);
       hudShown = v;
     });
+  }
+  // what the panel says in place of the number
+  function hudEmptyText() {
+    const c = model.byId[S.a.residence];
+    if (!c) return t('hud.empty');
+    return S.guessing() ? t('hud.guess', { country: i18n.countryName(c) }) : t('hud.income');
   }
   function updateHud() {
     if (!hudEl) return;
     const ready = S.ready();
-    const r = S.a.residence && ready.length ? S.compute(ready) : null;
-    hudEl.classList.toggle('empty', !r);
-    hudEl.querySelector('.hud-top').textContent = i18n.lang === 'es' ? 'Top ' : 'Top ';
+    // Nothing in the panel may rest on a guess: while the country is only the browser's, the panel stays blank.
+    const r = S.a.residence && ready.length && !S.guessing() ? S.compute(ready) : null;
+    // The place itself waits for income. The country and the passports alone say little about one person.
+    const placed = !!r && S.placed();
+    hudEl.classList.toggle('empty', !placed);
+    hudEl.querySelector('.hud-empty').textContent = hudEmptyText();
+    if (placed) hudEl.crowd.removeAttribute('aria-hidden'); else hudEl.crowd.setAttribute('aria-hidden', 'true'); // its label names a gold one
     hudEl.dims.querySelectorAll('li').forEach((li) => {
       const d = r && r.dims.find((x) => x.id === li.dataset.dim);
       li.classList.toggle('on', !!d);
-      li.querySelector('.b i').style.width = d ? Math.max(2, d.global * 100) + '%' : '0%';
-      li.querySelector('.v').textContent = d ? fmt.int(Math.round(d.global * 100)) : '';
+      li.querySelector('.b i').style.transform = `scaleX(${d ? Math.max(0.02, d.global) : 0})`; // a transform, so the bar grows without a layout pass
+      li.querySelector('.v').textContent = d ? fmt.int(Math.round(d.global * 100)) + '%' : '';
     });
-    if (!r) { hudShown = null; paintCrowd(-1); return; }
-    const top = r.overall.ahead * 100;
-    const shown = top < 10 ? Math.round(top * 10) / 10 : Math.round(top);
+    if (!placed) { hudShown = null; paintCrowd(-1); return; }
+    // the same wording rule as the verdict: "ahead of 25%" when you, or your country's typical person, are in the lower half
+    const lower = HLIA.results ? HLIA.results.frameAhead(r) : r.overall.pct < 0.5;
+    if (lower !== hudLower) { hudLower = lower; hudShown = null; } // a new wording starts from its own number, not from the old one
+    hudEl.num.classList.toggle('ahead', lower);
+    hudEl.querySelector('.hud-top').textContent = t(lower ? 'w.ahead' : 'w.top');
+    const share = (lower ? r.overall.pct : r.overall.ahead) * 100;
+    const shown = share < 10 ? Math.round(share * 10) / 10 : Math.round(share);
     showNumber(shown);
     paintCrowd(r.overall.pct);
     hudEl.querySelector('.hud-sub').textContent = t('hud.ahead', { behind: i18n.people(r.overall.behind) });
-    hudSay && hudSay(t('hud.title') + ': ' + t('hud.top', { pct: fmt.dec(shown, shown < 10 ? 1 : 0) }));
+    hudSay && hudSay(t('hud.title') + ': ' + t(lower ? 'a.ahead' : 'hud.top', { pct: pctText(shown) }));
   }
 
   // ---------- "how we read this" ----------
@@ -357,7 +386,9 @@
   function paintProgress() {
     progressEl.replaceChildren(...Array.from({ length: TOTAL }, (_, i) => {
       const n = i + 1;
-      const b = el('button', { type: 'button', 'aria-current': n === S.step ? 'step' : null, disabled: n > S.maxStep, onclick() { if (n <= S.maxStep) go(n); } },
+      // a phone hides the word beside the number, so the name says it: "Step 2 of 5: Money"
+      const name = `${t('wiz.step', { n, total: TOTAL })}: ${t(`wiz.s${n}.short`)}`;
+      const b = el('button', { type: 'button', 'aria-label': name, 'aria-current': n === S.step ? 'step' : null, disabled: n > S.maxStep, onclick() { if (n <= S.maxStep) go(n); } },
         el('span', { class: 'n' }, String(n)), el('span', { class: 's' }, t(`wiz.s${n}.short`)));
       return el('li', { class: n < S.step ? 'done' : n === S.step ? 'now' : '' }, b);
     }));
@@ -370,6 +401,7 @@
   function go(n, { focus = true } = {}) {
     S.step = clamp(n, 1, TOTAL);
     S.maxStep = Math.max(S.maxStep, S.step);
+    if (S.step !== 3) closeAsk();
     Array.from(stepsWrap.children).forEach((s, i) => { s.hidden = i + 1 !== S.step; });
     const cur = stepsWrap.children[S.step - 1];
     cur.classList.remove('enter'); void cur.offsetWidth; cur.classList.add('enter');
@@ -386,10 +418,44 @@
     }
     updateReads();
   }
+  // ---------- an untouched home list is not "none" ----------
+  // The list starts with everything off, so a visitor who skims past it would be counted as having none of it.
+  // Next with nothing tapped asks first. Another press of Next, while the question is open, takes the visitor back to it:
+  // only its own yes button counts as the answer.
+  function closeAsk() {
+    if (!askEl) return;
+    // a tap elsewhere can close it while focus is still on one of its buttons: keep focus in the list, not at the top of the page
+    if (askEl.contains(document.activeElement)) refs.basics.querySelector('input').focus({ preventScroll: true });
+    askEl.remove(); askEl = null;
+  }
+  function touchBasics() { S.basicsTouched = true; closeAsk(); }
+  function askBasics() {
+    const smooth = () => (HLIA.util.reducedMotion() ? 'auto' : 'smooth');
+    const fix = el('button', { type: 'button', class: 'btn btn-ghost', onclick() {
+      closeAsk();
+      const first = refs.basics.querySelector('input');
+      first.scrollIntoView({ block: 'center', behavior: smooth() });
+      first.focus({ preventScroll: true });
+    } }, t('ask.basics.no'));
+    const ok = el('button', { type: 'button', class: 'btn btn-ghost', onclick() { touchBasics(); next(); } }, t('ask.basics.yes'));
+    askEl = el('div', { class: 'ask', role: 'alert' }, el('p', null, t('ask.basics')), el('div', { class: 'ask-actions' }, fix, ok));
+    refs.basicsBlock.appendChild(askEl);
+    askEl.scrollIntoView({ block: 'center', behavior: smooth() });
+    fix.focus({ preventScroll: true });
+  }
   function next() {
     if (!validate(S.step)) return;
-    if (S.step === 3) S.basicsTouched = true;
-    if (S.step === TOTAL) { update(); HLIA.app.reveal(); return; }
+    if (S.step === 3 && !S.basicsTouched) {
+      if (!askEl) askBasics();
+      else {
+        ui.say(t('ask.basics'));
+        askEl.scrollIntoView({ block: 'center', behavior: HLIA.util.reducedMotion() ? 'auto' : 'smooth' });
+        askEl.querySelector('button').focus({ preventScroll: true });
+      }
+      return;
+    }
+    if (S.step === 3) touchBasics();
+    if (S.step === TOTAL) { update(); hudSay.cancel(); HLIA.app.reveal(); return; }
     S.maxStep = Math.max(S.maxStep, S.step + 1);
     update();
     go(S.step + 1);
@@ -398,19 +464,21 @@
   // ---------- build ----------
   function render() {
     Object.keys(refs).forEach((k) => delete refs[k]);
+    askEl = null; // the rebuilt list has no question open
+    root.setAttribute('aria-label', t('wiz.label')); // the region name follows the language
+    hudSay && hudSay.cancel(); // the panel is rebuilt, and says its own line again
     stepsWrap.replaceChildren(...BUILDERS.map((build, i) => {
       const n = i + 1;
-      return el('fieldset', { class: 'step', 'data-step': n, hidden: n !== S.step },
-        el('legend', { class: 'sr-only' }, t(`wiz.s${n}.title`)),
+      // a plain block, not a fieldset with a hidden legend: the heading names the step, so a screen reader hears the title once
+      return el('div', { class: 'step', 'data-step': n, hidden: n !== S.step },
         el('header', { class: 'step-head' },
-          el('p', { class: 'step-count' }, t('wiz.step', { n, total: TOTAL })),
           el('h1', { tabindex: '-1' }, t(`wiz.s${n}.title`)),
           el('p', { class: 'read' }, t(`wiz.s${n}.intro`))),
         el('div', { class: 'step-body' }, ...build()));
     }));
     navBack.textContent = t('wiz.back');
     root.querySelector('.hud-slot').replaceChildren(buildHud());
-    hudShown = null;
+    hudShown = null; hudLower = null;
     paintProgress(); paintNav();
     updateReads(); updateHud();
   }
@@ -434,7 +502,9 @@
   }
   function debounceSay() {
     let timer;
-    return (msg) => { clearTimeout(timer); timer = setTimeout(() => ui.say(msg), 1200); };
+    const say = (msg) => { clearTimeout(timer); timer = setTimeout(() => ui.say(msg), 1200); };
+    say.cancel = () => clearTimeout(timer); // a line still waiting must not be read out over the next page
+    return say;
   }
 
   let renderedLang = null;
@@ -446,9 +516,10 @@
     const go = () => HLIA.results.load3d();
     if ('requestIdleCallback' in global) requestIdleCallback(go, { timeout: 2500 }); else setTimeout(go, 1200);
   }
-  function open() {
+  function open({ focus = false } = {}) {
     if (!stepsWrap.children.length || renderedLang !== i18n.lang) { render(); renderedLang = i18n.lang; }
     go(S.step, { focus: false });
+    if (focus) stepsWrap.children[S.step - 1].querySelector('h1').focus({ preventScroll: true }); // the person came from a button that is gone
     warmUp();
   }
 

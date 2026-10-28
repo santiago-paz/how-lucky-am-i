@@ -16,6 +16,10 @@
   const day = (z) => fmt.money(z, 'USD', z < 10 ? 2 : 0);
   const pctInt = (p) => fmt.int(Math.round(p * 100));
   const pctSmart = (p) => { const v = p * 100; return v >= 99.5 ? '99.9' : v < 10 ? fmt.dec(v, 1) : fmt.int(Math.round(v)); };
+  // When you, or your country's typical person, are in the lower half, the page says "ahead of 84%", never "top 59%" or
+  // "top 96%": nothing here measures anyone's worth. The verdict, the "where you live" card, the share card and the shared
+  // text all use this one rule, so one visitor never reads two frames for the same place.
+  const frameAhead = (R) => R.overall.pct < 0.5 || (Number.isFinite(R.overall.typicalPct) && R.overall.typicalPct < 0.5);
   const AREA_ICON = { income: 'coin', wealth: 'key', mobility: 'plane', health: 'heart', education: 'school', basics: 'housing', safety: 'shield', stability: 'globe' };
 
   // ---------- shared helpers (also used by results2.js) ----------
@@ -81,10 +85,10 @@
     st.disposers.push(() => { io.disconnect(); if (box.chart) { box.chart.dispose(); box.chart = null; } });
     return box;
   }
-  HLIA.results = { load3d, infoFor, section, tableView };
+  HLIA.results = { load3d, infoFor, section, tableView, frameAhead, pctSmart };
 
   // ---------- navigation ----------
-  const NAV = [['place', 'nav.place'], ['money', 'nav.money'], ['pyramid', 'nav.pyramid'], ['areas', 'nav.areas'], ['compare', 'nav.compare'], ['passport', 'nav.passport'], ['basics', 'nav.basics'], ['lottery', 'nav.lottery'], ['time', 'nav.time'], ['share', 'nav.share'], ['method', 'nav.method']];
+  const NAV = [['place', 'nav.place'], ['money', 'nav.money'], ['pyramid', 'nav.pyramid'], ['areas', 'nav.areas'], ['compare', 'nav.compare'], ['passport', 'nav.passport'], ['basics', 'nav.basics'], ['lottery', 'nav.lottery'], ['time', 'nav.time'], ['share', 'nav.share'], ['next', 'nav.next'], ['method', 'nav.method']];
   function navBar() {
     const nav = el('nav', { class: 'r-nav', 'aria-label': t('nav.label') },
       el('ul', { role: 'list' }, ...NAV.map(([id, key]) => el('li', null, el('a', { href: '#' + id, 'data-sec': id }, t(key))))));
@@ -94,7 +98,7 @@
   function watchNav() {
     navIO && navIO.disconnect();
     const links = Object.fromEntries($$('.r-nav a').map((a) => [a.dataset.sec, a]));
-    const order = ['place', 'step-money', 'pyramid', 'areas', 'compare', 'passport', 'basics', 'lottery', 'time', 'share', 'method'];
+    const order = ['place', 'step-money', 'pyramid', 'areas', 'compare', 'passport', 'basics', 'lottery', 'time', 'share', 'next', 'method'];
     const live = new Set(); // the sections that cross the reading line right now
     navIO = new IntersectionObserver((entries) => {
       entries.forEach((e) => (e.isIntersecting ? live.add(e.target.id) : live.delete(e.target.id)));
@@ -118,7 +122,74 @@
     const p = top * 100;
     return t(p <= 1 ? 'v.note.1' : p <= 10 ? 'v.note.10' : p <= 25 ? 'v.note.25' : p <= 50 ? 'v.note.50' : 'v.note.100');
   }
-  const widthFor = (topShare) => 75 + 50 * clamp(topShare, 0, 1); // the more exclusive the group, the narrower the figure
+  // the more exclusive the group, the narrower the figure; the widest is 110%, so "100" on the first frame still fits its card
+  const widthFor = (topShare) => Math.min(110, 75 + 50 * clamp(topShare, 0, 1));
+
+  // ---------- story: where you live ----------
+  // A typical person in the visitor's country, then the visitor, on the same crowd of 100 people the live panel uses.
+  // The model has always computed the typical resident's overall place; this is the one screen that shows it.
+  // Both stops share one frame, so the two figures compare: "Ahead of 41%" and "Ahead of 84%" when either stop is in the
+  // lower half, "Top 12%" and "Top 9%" when both are in the upper half.
+  function placeParts(pct, ahead) {
+    const num = ahead ? pctSmart(pct) : topLabel(1 - pct);
+    return { pre: t(ahead ? 'w.ahead' : 'w.top'), num, full: t(ahead ? 'a.ahead' : 'a.top', { pct: num }) };
+  }
+  function whyStep(R) {
+    const you = R.overall.pct, typ = R.overall.typicalPct;
+    const c = model.byId[S.a.residence];
+    if (!c || !Number.isFinite(you) || !Number.isFinite(typ)) return null;
+    const country = i18n.countryName(c);
+    const dotOf = (p) => clamp(Math.round(p * 100), 0, 99);
+    const k = dotOf(you), kt = dotOf(typ), lo = Math.min(k, kt), hi = Math.max(k, kt);
+    // dots: behind both (o b), between the two (g), ahead of both (o a); the typical person is a ring, you are gold
+    const crowd = el('div', { class: 'crowd why-crowd' + (k < kt ? ' below' : ''), role: 'img', 'aria-label': t('w.alt', { country }) });
+    for (let i = 0; i < 100; i++) {
+      const dot = el('i', { class: i === k ? (k === kt ? 'y t' : 'y') : i === kt ? 't' : i < lo ? 'o b' : i > hi ? 'o a' : 'g ' + (k > kt ? 'b' : 'a') });
+      crowd.appendChild(dot);
+    }
+    const ahead = frameAhead(R); // the same frame as the verdict and the share card
+    const row = (cls, who, p) => {
+      const x = placeParts(p, ahead);
+      return el('li', { class: 'why-row ' + cls },
+        el('span', { class: 'why-key', 'aria-hidden': 'true' }),
+        el('span', { class: 'why-who' }, who),
+        el('span', { class: 'sr-only' }, ': ' + x.full),
+        el('span', { class: 'why-val', 'aria-hidden': 'true', style: { fontStretch: widthFor(1 - p) + '%' } },
+          el('span', { class: 'why-pre' }, x.pre), el('span', { class: 'why-n' }, x.num, el('span', { class: 'why-sym' }, '%'))));
+    };
+    const rows = el('ul', { class: 'why-rows', role: 'list' }, row('t', t('c.typical', { country }), typ), row('y', t('c.you'), you));
+    const gap = k === kt ? t('w.level', { country }) : t('w.gap', { n: i18n.people(Math.abs(you - typ) * model.worldPop), country });
+    const card = el('div', { class: 'story-card why' },
+      el('h2', { id: 'why-t' }, t('w.title')),
+      el('p', { class: 'read' }, t('w.lead', { country })),
+      el('div', { class: 'why-viz' }, crowd, rows),
+      el('p', { class: 'why-gap' }, gap),
+      el('p', { class: 'small why-stat' }, t('l.fact'), ' ', infoFor(['milanovic'])),
+      el('a', { class: 'small why-more', href: '#compare' }, t('w.more')));
+    // A short screen drops the link first, then the lead, so the card never has to scroll inside itself.
+    const fit = () => {
+      card.classList.remove('lean', 'leaner');
+      const over = () => card.scrollHeight > card.clientHeight + 1;
+      if (over()) card.classList.add('lean');
+      if (over()) card.classList.add('leaner');
+    };
+    const refit = HLIA.util.debounce(fit, 150); // after the resize has settled, so the card measures against the new height
+    global.addEventListener('resize', refit);
+    st.disposers.push(() => global.removeEventListener('resize', refit));
+    requestAnimationFrame(fit);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+
+    // The one move: the first time the card is in view, the stretch between the two marks lights up, all at once.
+    // (A sweep from one mark to the other would read as a climb or a fall, and the card names no cause.)
+    // With less motion, or without IntersectionObserver, the card just shows its end state.
+    if (k !== kt && !HLIA.util.reducedMotion() && typeof IntersectionObserver !== 'undefined') {
+      crowd.classList.add('arm');
+      const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { crowd.classList.add('on'); io.disconnect(); } }, { threshold: 0.6 });
+      io.observe(card);
+      st.disposers.push(() => io.disconnect());
+    }
+    return el('article', { class: 'story-step', id: 'step-why' }, card);
+  }
 
   function storySection(R) {
     const host = el('div', { class: 'globe-host' });
@@ -127,21 +198,24 @@
     const top = R.overall.ahead;
 
     // verdict
-    const pctEl = el('span', { class: 'v-pct' }, '100');
-    const numEl = el('p', { class: 'v-num', 'aria-live': 'off' }, el('span', { class: 'v-top' }, i18n.lang === 'es' ? 'Top' : 'Top'), pctEl, el('span', { class: 'v-sym' }, '%'));
+    // in the "ahead" frame the figure is the share you are ahead of ("You are ahead of 84% of ..."), with no "Top" word
+    const lower = frameAhead(R);
+    const pctEl = el('span', { class: 'v-pct' }, lower ? '0' : '100');
+    const numEl = el('p', { class: 'v-num', 'aria-live': 'off' }, lower ? null : el('span', { class: 'v-top' }, t('w.top')), pctEl, el('span', { class: 'v-sym' }, '%'));
     const moreEl = el('p', { class: 'v-more' }, '');
     const clover = el('span', { class: 'v-clover', 'aria-hidden': 'true' });
     const arrow = el('span', { class: 'v-arrow', 'aria-hidden': 'true' });
     const verdict = el('article', { class: 'story-step', id: 'step-verdict' }, el('div', { class: 'story-card' },
       clover,
-      el('p', { class: 'v-lead' }, t('v.lead')),
+      el('p', { class: 'v-lead' }, t(lower ? 'v.lead.ahead' : 'v.lead')),
       numEl,
       el('p', { class: 'v-of' }, t('v.of', { pop: i18n.people(HLIA.DATA.meta.pipPop) })),
       moreEl,
       el('p', { class: 'read v-note' }, verdictNote(top)),
       el('div', { class: 'v-actions' },
         el('button', { type: 'button', class: 'btn btn-quiet v-skip', 'data-mode': 'skip', onclick: onStoryButton }, t('v.skip')),
-        el('p', { class: 'v-scroll small' }, arrow, t('v.scroll')))));
+        el('p', { class: 'v-scroll small' }, arrow, t('v.scroll')),
+        el('a', { class: 'btn btn-ghost v-share', href: '#share', onclick: jumpToShare }, ui.icon('share'), ' ', t('v.share')))));
 
     // money
     const inc = R.income;
@@ -149,11 +223,11 @@
     const youEl = el('p', { class: 'm-you' }, el('span', { class: 'dot-gold', 'aria-hidden': 'true' }), el('b', null, t('m.you')), ' ', t('m.perDay', { day: day(inc.z) }));
     const ratio = inc.z / m.median;
     const facts = el('ul', { class: 'm-facts', role: 'list' },
-      el('li', null, el('b', null, t('m.median')), ' ', t('m.perDay', { day: day(m.median) })),
+      el('li', null, el('b', null, t('m.median')), ' ', t('m.perDayMed', { day: day(m.median) })),
       el('li', null, ratio >= 1 ? t('m.times', { x: fmt.dec(ratio, ratio < 10 ? 1 : 0) }) : ratio < 0.005 ? t('m.zero') : t('m.timesLess', { x: fmt.dec(ratio, 2) })),
-      el('li', null, t('m.p99', { day: day(m.p99) })),
-      el('li', null, t('m.line3', { n: i18n.people(HLIA.DATA.meta.pipPop * model.cdf(model.WF, 3)) })));
-    const tryTop = el('p', { class: 'm-trytop small', 'aria-live': 'polite' }, '');
+      el('li', { class: 'm-x', id: 'm-p99' }, t('m.p99', { day: day(m.p99) })),
+      el('li', { class: 'm-x', id: 'm-line3' }, t('m.line3', { n: i18n.people(HLIA.DATA.meta.pipPop * model.cdf(model.WF, 3)) })));
+    const tryTop = el('p', { class: 'm-trytop small idle', 'aria-live': 'polite' }, t('m.tryHint'));
     const slider = el('input', { type: 'range', class: 'range', min: '0', max: '1000', step: '1', id: 'm-try', 'aria-describedby': 'm-trytop' });
     tryTop.id = 'm-trytop';
     const posOf = (z) => Math.round(clamp(Math.log(z / 0.5) / Math.log(2000), 0, 1) * 1000);
@@ -161,7 +235,8 @@
     slider.value = String(posOf(inc.z));
     slider.style.setProperty('--fill', slider.value / 10 + '%');
     // the button and the line of text have a row of their own that is always there, so the card keeps its height
-    const resetBtn = el('button', { type: 'button', class: 'btn btn-quiet', disabled: true, onclick() { setTry(null); } }, t('m.reset'));
+    // on a phone the button is the icon alone (the words stay for a screen reader), so the sentence beside it keeps two lines and the card does not grow while you drag
+    const resetBtn = el('button', { type: 'button', class: 'btn btn-quiet m-reset', disabled: true, onclick() { setTry(null); } }, ui.icon('refresh'), el('span', { class: 'm-reset-t' }, t('m.reset')));
     resetBtn.style.visibility = 'hidden';
     function setTry(z) {
       st.tryZ = z;
@@ -169,7 +244,10 @@
       slider.value = String(posOf(zz)); slider.style.setProperty('--fill', slider.value / 10 + '%');
       resetBtn.disabled = z == null;
       resetBtn.style.visibility = z == null ? 'hidden' : '';
-      tryTop.textContent = z == null ? '' : t('m.tryTop', { day: day(zz), pct: pctSmart(1 - model.cdf(model.WF, zz)) });
+      // the same wording rule as the verdict: below the median it says "ahead of 2%", never "top 98%"
+      const below = model.cdf(model.WF, zz); // the share of people who live on less than this
+      tryTop.classList.toggle('idle', z == null);
+      tryTop.textContent = z == null ? t('m.tryHint') : below < 0.5 ? t('m.tryAhead', { day: day(zz), pct: pctSmart(below) }) : t('m.tryTop', { day: day(zz), pct: pctSmart(1 - below) });
       if (st.globe) st.globe.setUser({ z: zz, id: S.a.residence });
       if (st.fallback) st.fallback.setUser({ z: zz, id: S.a.residence });
     }
@@ -177,16 +255,29 @@
     const seg = el('div', { class: 'seg', role: 'group' },
       el('button', { type: 'button', 'aria-pressed': 'true', 'data-m': 'globe', onclick: () => setMode('globe') }, t('m.globe')),
       el('button', { type: 'button', 'aria-pressed': 'false', 'data-m': 'skyline', onclick: () => setMode('skyline') }, t('m.sky')));
-    const money = el('article', { class: 'story-step', id: 'step-money' }, el('div', { class: 'story-card' },
-      el('h2', { id: 'money-t' }, t('m.title')), el('p', { class: 'read' }, t('m.body')),
+    // On a phone, and on a screen under 780px tall, the card keeps to your number, the median, the slider and the switch, so
+    // the picture stays in view. The sentence that explains the picture, the two extra numbers and the source wait behind
+    // this button; the card grows upward from the bottom, so the button stays where the thumb is.
+    const more = el('button', { type: 'button', class: 'btn btn-quiet m-more', 'aria-expanded': 'false', 'aria-controls': 'm-body m-p99 m-line3 m-src', onclick() {
+      const open = moneyCard.classList.toggle('m-open');
+      more.setAttribute('aria-expanded', String(open));
+      more.replaceChildren(ui.icon(open ? 'minus' : 'plus'), ' ', t(open ? 'm.less' : 'm.more'));
+    } }, ui.icon('plus'), ' ', t('m.more'));
+    const moneyCard = el('div', { class: 'story-card' },
+      el('h2', { id: 'money-t' }, t('m.title')), el('p', { class: 'read m-body', id: 'm-body' }, t('m.body')),
       youEl, facts,
       el('div', { class: 'm-try' }, el('label', { for: 'm-try', class: 'field-label' }, t('m.try')), slider, el('div', { class: 'm-tryrow' }, tryTop, resetBtn)),
       seg,
-      el('p', { class: 'small m-src' }, t('m.src'), ' ', infoFor(['pip', 'pipLines', 'gwwc']))));
+      el('p', { class: 'small m-src', id: 'm-src' }, t('m.src'), ' ', infoFor(['pip', 'pipLines', 'gwwc'])),
+      more);
+    const money = el('article', { class: 'story-step', id: 'step-money' }, moneyCard);
+
+    // where you live: a typical person in the visitor's country, then the visitor (null if the model gives no typical place)
+    const why = whyStep(R);
 
     // the page's one h1 while the report is showing, for screen readers and the outline
-    const sec = el('section', { id: 'place', class: 'story', 'aria-label': t('nav.place') }, el('h1', { class: 'sr-only' }, t('v.h1')), stage,
-      el('div', { class: 'story-steps' }, verdict, el('div', { id: 'money', class: 'story-anchor' }), money));
+    const sec = el('section', { id: 'place', class: 'story', 'aria-label': t('nav.place') }, el('h1', { class: 'sr-only', id: 'place-t', tabindex: '-1' }, t('v.h1')), stage,
+      el('div', { class: 'story-steps' }, verdict, why, el('div', { id: 'money', class: 'story-anchor' }), money));
     sec.refs = { host, labels, pctEl, numEl, moreEl, seg, setTry, clover, arrow };
     return sec;
   }
@@ -195,13 +286,13 @@
   function setCounter(refs, e) {
     const R = st.R, top = R.overall.ahead;
     const v = 1 - (1 - top) * e; // share of people ahead of the current threshold, falling to yours
-    refs.pctEl.textContent = topLabel(v);
+    refs.pctEl.textContent = frameAhead(R) ? pctSmart(1 - v) : topLabel(v); // "ahead" frame: the share you are ahead of, rising to yours
     refs.numEl.style.fontStretch = widthFor(v) + '%';
     refs.moreEl.textContent = t('v.more', { n: i18n.people(R.overall.behind * e) });
   }
   function finishCounter(refs) {
     setCounter(refs, 1);
-    refs.numEl.setAttribute('aria-label', t('hud.top', { pct: topLabel(st.R.overall.ahead) }));
+    refs.numEl.setAttribute('aria-label', frameAhead(st.R) ? pctSmart(st.R.overall.pct) + '%' : t('hud.top', { pct: topLabel(st.R.overall.ahead) }));
     // The button keeps its place so the card never changes height: it says "skip" while the
     // reveal plays and "play it again" after. The flat fallback has nothing to replay.
     const btn = document.querySelector('.v-skip');
@@ -223,6 +314,17 @@
     playStory(st.refs);
   }
   const onStoryButton = (ev) => (ev.currentTarget.dataset.mode === 'replay' ? replayStory() : skipStory());
+
+  // The share card is far down the page. The link goes there at once instead of sweeping past every chart on the way, and
+  // the heading takes focus so a keyboard or screen reader user starts where the card is.
+  function jumpToShare(ev) {
+    const sec = document.getElementById('share');
+    if (!sec) return;
+    ev.preventDefault();
+    sec.scrollIntoView({ behavior: 'instant', block: 'start' });
+    const h = document.getElementById('share-t');
+    if (h) { h.tabIndex = -1; h.focus({ preventScroll: true }); }
+  }
 
   async function playStory(refs) {
     setCounter(refs, 0);
@@ -345,11 +447,10 @@
     stepIO = new IntersectionObserver((entries) => {
       entries.forEach((e) => {
         if (!e.isIntersecting) return;
-        if (e.target.id === 'step-money') setMode('skyline');
-        if (e.target.id === 'step-verdict') setMode('globe');
+        setMode(e.target.id === 'step-money' ? 'skyline' : 'globe'); // the verdict and the "where you live" card sit on the globe
       });
     }, { rootMargin: '-42% 0px -42% 0px', threshold: 0 }); // fires when a step crosses the middle of the screen
-    ['step-verdict', 'step-money'].forEach((id) => stepIO.observe(document.getElementById(id)));
+    ['step-verdict', 'step-why', 'step-money'].forEach((id) => { const n = document.getElementById(id); if (n) stepIO.observe(n); }); // the "where you live" card is missing when the model has no typical person
   }
 
   // ---------- pyramid ----------
@@ -443,25 +544,32 @@
   };
   function areasSection(R) {
     const c = model.byId[S.a.residence];
+    // One wording for the whole section, the same rule as the verdict: "ahead of 51%" when you, or your country's typical
+    // person, are in the lower half, "top 49%" otherwise. The bars and the towers already grow with the share you are ahead of.
+    const lower = frameAhead(R);
+    const words = (share) => placeParts(share, lower).full; // the full words: tips and the table
+    const figure = (share) => (lower ? pctSmart(share) + '%' : t('a.top', { pct: topLabel(1 - share) })); // a label on a tower: when ahead, the number alone, which fits beside its neighbours
     const rows = R.dims.map((d) => {
       const fill = el('span', { class: 'bar-fill', style: { width: '0%' } });
       const row = el('li', { class: 'area-row', 'data-id': d.id, tabindex: '0' },
         el('div', { class: 'area-head' },
           el('span', { class: 'area-ico' }, ui.icon(AREA_ICON[d.id])),
           el('span', { class: 'area-name' }, t('dim.' + d.id)),
-          el('span', { class: 'area-val' }, el('b', null, t('a.top', { pct: topLabel(1 - d.global) })), ' ', el('span', { class: 'area-sub' }, t('a.ahead', { pct: pctInt(d.global) }))),
+          el('span', { class: 'area-val' }, ...(lower
+            ? [el('span', { class: 'area-pre' }, t('w.ahead')), ' ', el('b', null, pctSmart(d.global) + '%')]
+            : [el('b', null, words(d.global)), ' ', el('span', { class: 'area-sub' }, t('a.ahead', { pct: pctInt(d.global) }))])),
           infoFor(AREA_SOURCES[d.id])),
-        el('div', { class: 'bar', role: 'img', 'aria-label': `${t('dim.' + d.id)}: ${t('a.ahead', { pct: pctInt(d.global) })}` }, fill),
+        el('div', { class: 'bar', role: 'img', 'aria-label': `${t('dim.' + d.id)}: ${lower ? words(d.global) : t('a.ahead', { pct: pctInt(d.global) })}` }, fill),
         el('p', { class: 'area-text' }, areaText(d, R), ' ', el('span', { class: 'q q-' + d.data }, t('a.q.' + d.data))));
       row.fill = fill; row.target = d.global;
-      const show = (ev) => ui.tip.show([el('strong', null, t('a.top', { pct: topLabel(1 - d.global) })), el('div', null, `${t('dim.' + d.id)}: ${t('a.ahead', { pct: pctInt(d.global) })}`)], ev.clientX || row.getBoundingClientRect().left + 120, ev.clientY || row.getBoundingClientRect().top);
+      const show = (ev) => ui.tip.show([el('strong', null, words(d.global)), el('div', null, lower ? t('dim.' + d.id) : `${t('dim.' + d.id)}: ${t('a.ahead', { pct: pctInt(d.global) })}`)], ev.clientX || row.getBoundingClientRect().left + 120, ev.clientY || row.getBoundingClientRect().top);
       row.querySelector('.bar').addEventListener('pointermove', show);
       row.querySelector('.bar').addEventListener('pointerleave', () => ui.tip.hide());
       row.addEventListener('focus', show); row.addEventListener('blur', () => ui.tip.hide());
       return row;
     });
     const list = el('ul', { class: 'areas', role: 'list' }, ...rows);
-    const tbl = tableView([t('tbl.area'), t('tbl.value')], R.dims.map((d) => [t('dim.' + d.id), `${t('a.ahead', { pct: pctInt(d.global) })} (${t('a.top', { pct: topLabel(1 - d.global) })})`]));
+    const tbl = tableView([t('tbl.area'), t('tbl.value')], R.dims.map((d) => [t('dim.' + d.id), lower ? words(d.global) : `${t('a.ahead', { pct: pctInt(d.global) })} (${words(d.global)})`]));
     const estNote = c.est && c.est.length > 4 ? el('p', { class: 'small' }, t('a.est')) : null;
     // the same eight areas as towers in 3D: your height in emerald, the typical person in your country as a violet ring
     const country = i18n.countryName(c);
@@ -471,15 +579,15 @@
     const hot = (id) => rows.forEach((r) => r.classList.toggle('hot', r.dataset.id === id));
     const view = lazy3d(host, () => {
       const chart = new HLIA.Towers3D(host, {
-        areas: R.dims.map((d) => ({ id: d.id, value: d.global, typical: d.typical, text: t('a.top', { pct: topLabel(1 - d.global) }), name: t('dim.' + d.id), icon: ui.icon(AREA_ICON[d.id]) })),
-        overall: { value: R.overall.pct, text: t('a.top', { pct: topLabel(R.overall.ahead) }), name: t('tw.overall') },
+        areas: R.dims.map((d) => ({ id: d.id, value: d.global, typical: d.typical, text: figure(d.global), name: t('dim.' + d.id), short: t('dim.short.' + d.id), icon: ui.icon(AREA_ICON[d.id]) })),
+        overall: { value: R.overall.pct, text: figure(R.overall.pct), name: t('tw.overall') },
         colors: { you: HLIA.util.cssVar('--you') || '#ffc14d', area: HLIA.util.cssVar('--ahead') || '#35d6a0', typical: HLIA.util.cssVar('--context') || '#9b8cff' },
         labels: { ahead: t('tw.ahead'), all: t('tw.all'), half: t('tw.half') }, reduced: HLIA.util.reducedMotion(),
         onHover(h) {
           if (!h) { ui.tip.hide(); hot(null); return; }
           const d = R.dims[h.index];
           hot(d.id);
-          ui.tip.show([el('strong', null, `${t('dim.' + d.id)}: ${t('a.top', { pct: topLabel(1 - d.global) })}`), el('div', null, `${t('c.typical', { country })}: ${t('a.top', { pct: topLabel(1 - d.typical) })}`)], h.clientX, h.clientY);
+          ui.tip.show([el('strong', null, `${t('dim.' + d.id)}: ${words(d.global)}`), el('div', null, `${t('c.typical', { country })}: ${words(d.typical)}`)], h.clientX, h.clientY);
         },
       });
       host.appendChild(el('button', { type: 'button', class: 'btn btn-quiet c3-replay', onclick: () => chart.play() }, ui.icon('refresh'), ' ', t('c3.replay')));
@@ -510,6 +618,8 @@
     const c = model.byId[S.a.residence];
     const name = i18n.countryName(c);
     const get = (id) => R.dims.find((d) => d.id === id);
+    const lower = frameAhead(R); // the same frame as the rest of the report: the tips lead with "Ahead of 51%" in the lower half, "Top 49%" otherwise
+    const words = (share) => placeParts(share, lower).full;
     const local = ['income', 'wealth', 'education', 'basics'].map((id) => ({ id, d: get(id) }));
     const host = el('div', { class: 'cmp-host' });
     const seg = el('div', { class: 'seg', role: 'group' });
@@ -546,11 +656,11 @@
         const line = (label, val) => el('div', null, `${label}: ${t('a.ahead', { pct: pctInt(val) })}`);
         const mk = (cx, K, r, val) => {
           const g = svg('g', { tabindex: '0', class: 'pt' });
-          g.appendChild(svg('circle', { cx, cy: y, r: 14, fill: 'transparent' }));
+          g.appendChild(svg('circle', { cx, cy: y, r: narrow ? 23 : 14, fill: 'transparent' })); // 44px across on a phone, after the plot is scaled to the screen
           g.appendChild(svg('circle', { cx, cy: y, r, fill: K.color, stroke: 'var(--bg)', 'stroke-width': 2 }));
           const show = (ev) => {
             const box = g.getBoundingClientRect();
-            const body = close ? [el('strong', null, t('dim.' + id)), line(A.label, a), line(B.label, b)] : [el('strong', null, t('a.top', { pct: topLabel(1 - val) })), line(K.label, val)];
+            const body = close ? [el('strong', null, t('dim.' + id)), line(A.label, a), line(B.label, b)] : [el('strong', null, words(val)), lower ? el('div', null, K.label) : line(K.label, val)];
             ui.tip.show(body, ev.clientX || box.left + 8, ev.clientY || box.top);
           };
           g.addEventListener('pointermove', show); g.addEventListener('focus', show); g.addEventListener('pointerleave', () => ui.tip.hide()); g.addEventListener('blur', () => ui.tip.hide());
@@ -583,7 +693,7 @@
           const g = svg('g', { tabindex: '0', class: 'pt' });
           g.appendChild(svg('circle', { cx: x, cy: y, r: 14, fill: 'transparent' }));
           g.appendChild(svg('circle', { cx: x, cy: y, r: 5, fill: col, stroke: 'var(--bg)', 'stroke-width': 2 }));
-          const show = (ev) => { const r = g.getBoundingClientRect(); ui.tip.show([el('strong', null, t('a.top', { pct: topLabel(1 - d[key]) })), el('div', null, `${t('dim.' + d.id)}: ${key === 'global' ? t('c.you') : t('c.typical', { country: name })}`)], ev.clientX || r.left + 6, ev.clientY || r.top); };
+          const show = (ev) => { const r = g.getBoundingClientRect(); ui.tip.show([el('strong', null, words(d[key])), el('div', null,`${t('dim.' + d.id)}: ${key === 'global' ? t('c.you') : t('c.typical', { country: name })}`)], ev.clientX || r.left + 6, ev.clientY || r.top); };
           g.addEventListener('pointermove', show); g.addEventListener('focus', show); g.addEventListener('pointerleave', () => ui.tip.hide()); g.addEventListener('blur', () => ui.tip.hide());
           s.appendChild(g);
         }
@@ -637,6 +747,17 @@
   // the clover and the bobbing arrow on the verdict card (the card is built again when the language changes)
   function startFx(refs) { if (HLIA.fx) { HLIA.fx.clover(refs.clover); HLIA.fx.arrow(refs.arrow); } }
 
+  // The report has just replaced the form, and the button that was pressed is gone. Focus goes to the report's heading, and one
+  // spoken line says it is up and where the visitor stands, in the same words as the verdict card.
+  function handOff() {
+    const R = st.R, h = document.getElementById('place-t');
+    if (!R || !h) return;
+    h.focus({ preventScroll: true });
+    const lower = frameAhead(R);
+    const place = lower ? pctSmart(R.overall.pct) + '%' : t('hud.top', { pct: topLabel(R.overall.ahead) });
+    ui.say([t('r.ready'), t(lower ? 'v.lead.ahead' : 'v.lead'), place, t('v.of', { pop: i18n.people(HLIA.DATA.meta.pipPop) })].join(' '));
+  }
+
   async function show() {
     st.R = S.compute();
     if (!st.R) return;
@@ -652,6 +773,7 @@
   HLIA.bus.on('lang', () => { if (S.view === 'results' && st.R) { st.R = S.compute(); const story = build(); mountStage(story).then(() => { startFx(story.refs); watchSteps(story.refs); finishCounter(story.refs); st.globe && st.globe.setWaveInstant(); }); } });
 
   HLIA.results.show = show;
+  HLIA.results.handOff = handOff;
   HLIA.results.state = st;
   HLIA.results.helpers = { day, pctInt, pctSmart, topLabel, AREA_ICON };
 })(window);

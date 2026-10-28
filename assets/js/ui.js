@@ -33,6 +33,7 @@
     refresh: 'M20 12a8 8 0 1 1-2.500-5.800M20 4v4.500h-4.500',
     play: 'M8 5.500v13l10.500-6.500L8 5.500Z',
     table: 'M4 5.500h16v13H4zM4 10h16M4 14.200h16M9.500 5.500v13',
+    lock: 'M6.500 11h11a1.500 1.500 0 0 1 1.500 1.500v6a1.500 1.500 0 0 1-1.500 1.500h-11A1.500 1.500 0 0 1 5 18.500v-6A1.500 1.500 0 0 1 6.500 11ZM8 11V8a4 4 0 0 1 8 0v3',
   };
   function icon(name, size) {
     const s = svg('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.8', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false' });
@@ -82,10 +83,38 @@
   }
   document.addEventListener('click', (e) => { if (openPop && !openPop.wrap.contains(e.target)) closePop(false); });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePop(true); });
+  // Keeps a popover where it can be read. It hangs below the button's right edge. A box that scrolls or clips (the cards in
+  // the pinned story do) cuts off whatever sticks out of it, so the popover stays inside the nearest such box and inside
+  // the viewport: it opens upward when there is more room above, and slides sideways to stay inside on both sides.
+  // The box that really cuts off what sticks out of a node: the viewport, narrowed by every ancestor that scrolls or clips,
+  // one axis at a time (overflow-x: clip cuts sideways only).
+  function clipBox(node) {
+    const box = { left: 0, top: 0, right: document.documentElement.clientWidth, bottom: document.documentElement.clientHeight };
+    for (let p = node.parentElement; p && p !== document.body; p = p.parentElement) {
+      const s = getComputedStyle(p), x = s.overflowX !== 'visible', y = s.overflowY !== 'visible';
+      if (!x && !y) continue;
+      const r = p.getBoundingClientRect();
+      if (x) { box.left = Math.max(box.left, r.left); box.right = Math.min(box.right, r.right); }
+      if (y) { box.top = Math.max(box.top, r.top); box.bottom = Math.min(box.bottom, r.bottom); }
+    }
+    return box;
+  }
+  function placePop(btn, pop) {
+    pop.classList.remove('up');
+    pop.style.transform = '';
+    const edge = 8, box = clipBox(pop);
+    const top = box.top + edge, bottom = box.bottom - edge, left = box.left + edge, right = box.right - edge;
+    const b = btn.getBoundingClientRect();
+    let r = pop.getBoundingClientRect();
+    // upward only when the whole popover fits above: a tall one stays below, where the page can scroll to it
+    if (r.bottom > bottom && b.top - top >= r.height + 8) { pop.classList.add('up'); r = pop.getBoundingClientRect(); }
+    const shift = r.left < left ? left - r.left : r.right > right ? right - r.right : 0;
+    if (shift) pop.style.transform = `translateX(${Math.round(shift)}px)`;
+  }
   function info({ title, text, rows = [], links = [], label }) {
     const id = 'pop-' + Math.random().toString(36).slice(2, 8);
     const pop = el('div', { class: 'info-pop', id, role: 'group', 'aria-label': title, hidden: true },
-      el('h4', null, title),
+      el('p', { class: 'pop-title' }, title), // the group is already named by its aria-label, and a popover is not a section of the page
       text ? el('p', null, text) : null,
       rows.length ? el('dl', null, ...rows.flatMap(([k, v]) => [el('dt', null, k), el('dd', null, v)])) : null,
       links.length ? el('p', { style: { marginTop: '0.7rem' } }, ...links.flatMap((l, i) => [i ? ' ' : null, el('a', { href: l.url, target: '_blank', rel: 'noopener noreferrer' }, l.label)])) : null,
@@ -97,9 +126,7 @@
       closePop(false);
       pop.hidden = false;
       btn.setAttribute('aria-expanded', 'true');
-      // keep the popover on screen
-      const r = pop.getBoundingClientRect();
-      if (r.left < 8) { pop.style.right = 'auto'; pop.style.left = '0'; }
+      placePop(btn, pop);
       openPop = { wrap, btn, pop };
     });
     return wrap;

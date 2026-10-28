@@ -300,55 +300,299 @@
   }
 
   // ---------- lottery ----------
+  // Each life drawn is one light dropped on an income line. The lights pile up and settle into the shape of the world, with the
+  // visitor as the gold post: on one side the lives with less money than theirs, on the other the lives with more.
   const PREMIUM = [['NGA', 14.85], ['HTI', 10.31], ['IND', 6.25], ['PHL', 3.82], ['BRA', 3.76], ['ARG', 2.54], ['MEX', 2.53]];
+  const LOT_MAX = 500; // lives in one visit: past that the pile no longer changes shape
+  const LOT_Z0 = 0.5, LOT_Z1 = 400; // dollars a day at the two ends of the income line
+  const LOT_TICKS = [1, 3, 10, 30, 100];
+  const lotSleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let lotUid = 0;
+
   function lotterySection(R, st) {
     const P = HLIA.people;
     const inc = R.income;
-    const host = el('div', { class: 'lot-globe' });
-    const card = el('div', { class: 'lot-card', 'aria-live': 'polite' }, el('p', { class: 'small' }, t('l.idle')));
-    const tally = el('p', { class: 'lot-tally' }, '');
-    const bar = el('div', { class: 'tally-bar', 'aria-hidden': 'true' }, el('i', { class: 'r' }), el('i', { class: 'p' }));
-    let n = 0, better = 0, g3 = null, busy = false;
-    const odds = 1 - model.cdf(model.WF, inc.z);
-    function paintTally() {
-      tally.textContent = n ? t('l.tally', { n, better, worse: n - better }) + ' ' + (n >= 8 ? t('l.tally.hint', { odds: Math.round(odds * 100) }) : '') : '';
-      bar.firstChild.style.width = n ? (better / n) * 100 + '%' : '0%';
-      bar.lastChild.style.width = n ? ((n - better) / n) * 100 + '%' : '0%';
+    const home = model.byId[S.a.residence];
+    const poorerShare = model.cdf(model.WF, inc.z); // the real odds that a random life has less money than yours
+    const mostPoorer = poorerShare >= 0.5; // the story is about the bigger side
+    const sideShare = mostPoorer ? poorerShare : 1 - poorerShare;
+    const uid = 'lot' + (++lotUid);
+    const lives = []; // the dot behind each life drawn, in order
+    const dots = []; // the circle behind each life
+    let nPoorer = 0, nRicher = 0, g3 = null, busy = false, pw = 0, ph = 0;
+    const smooth = () => !HLIA.util.reducedMotion();
+    const day = (z) => R1().helpers.day(z);
+
+    // ----- the parts
+    const host = el('div', { class: 'lot-globe', 'aria-hidden': 'true' }); // decorative: the words say where each life was born
+    const card = el('div', { class: 'lot-card' }); // a screen reader hears one line per life (see live), not the whole table
+    const say = el('div', { class: 'lot-say' });
+    const live = el('p', { class: 'sr-only', 'aria-live': 'polite' });
+    const dice = ui.icon('dice');
+    const btn = el('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: spin }, dice, ' ', t('l.spin'));
+    const btn10 = el('button', { type: 'button', class: 'btn btn-ghost btn-lg', 'aria-label': t('l.spin10.a'), onclick: () => many(10) }, t('l.spin10'));
+    const btn100 = el('button', { type: 'button', class: 'btn btn-ghost btn-lg', 'aria-label': t('l.spin100.a'), onclick: () => many(100) }, t('l.spin100'));
+    const actions = el('div', { class: 'lot-actions' }, btn, btn10, btn100);
+
+    // the pile: two counters, the income line with its lights, the split of lives drawn against the real odds
+    const cntP = el('b', null, '0'), cntR = el('b', null, '0');
+    const labP = el('span', null, t('l.side.poorer')), labR = el('span', null, t('l.side.richer')); // "1 life", "2 lives"
+    const splitP = el('i', { class: 'p' }), splitR = el('i', { class: 'r' });
+    const svgEl = svg('svg', { class: 'lot-svg', 'aria-hidden': 'true', focusable: 'false' });
+    const plot = el('div', { class: 'lot-plot' }, svgEl);
+    const gStatic = svg('g'), gDots = svg('g');
+    svgEl.append(gStatic, gDots);
+    const reset = el('button', { type: 'button', class: 'btn btn-quiet lot-reset', onclick: clearAll }, t('l.reset'));
+    const pile = el('div', { class: 'lot-pile' },
+      el('div', { class: 'lot-pile-head' }, el('h3', null, t('l.pile.t')), reset),
+      el('div', { class: 'lot-count', 'aria-hidden': 'true' },
+        el('p', { class: 'p' }, cntP, labP),
+        el('p', { class: 'r' }, cntR, labR)),
+      plot,
+      el('div', { class: 'lot-split', 'aria-hidden': 'true' }, splitP, splitR, el('i', { class: 'tick', style: { left: poorerShare * 100 + '%' } })));
+    // how to read the pile; it sits under the summary so the summary stays close to the lights
+    const note = el('p', { class: 'small lot-note' }, t('l.pile.axis') + ' ' + t('l.odds.tick'));
+
+    // ----- the income line
+    const PAD = { l: 8, r: 8, top: 30, bottom: 28 };
+    const lx = (z) => clamp((Math.log(z) - Math.log(LOT_Z0)) / (Math.log(LOT_Z1) - Math.log(LOT_Z0)), 0, 1);
+    const frame = () => ({ x0: PAD.l, x1: pw - PAD.r, base: ph - PAD.bottom, top: PAD.top, wid: pw - PAD.l - PAD.r, room: ph - PAD.bottom - PAD.top });
+    // the axis, the shape of the world behind the lights, and the gold post that is you
+    function buildStatic() {
+      const f = frame();
+      const X = (z) => f.x0 + lx(z) * f.wid;
+      const youX = X(inc.z);
+      const bins = 96, l0 = Math.log(LOT_Z0), l1 = Math.log(LOT_Z1);
+      const ps = Array.from({ length: bins }, (_, b) => model.cdf(model.WF, Math.exp(l0 + ((b + 1) / bins) * (l1 - l0))) - model.cdf(model.WF, Math.exp(l0 + (b / bins) * (l1 - l0))));
+      const pmax = Math.max(...ps);
+      const d = `M${f.x0},${f.base}` + ps.map((p, b) => `L${(f.x0 + ((b + 0.5) / bins) * f.wid).toFixed(1)},${(f.base - (p / pmax) * f.room * 0.8).toFixed(1)}`).join('') + `L${f.x1},${f.base}Z`;
+      gStatic.replaceChildren(
+        svg('defs', null,
+          svg('clipPath', { id: uid + 'L' }, svg('rect', { x: 0, y: 0, width: Math.max(0, youX), height: ph })),
+          svg('clipPath', { id: uid + 'R' }, svg('rect', { x: youX, y: 0, width: Math.max(0, pw - youX), height: ph }))),
+        svg('path', { d, class: 'ghost p', 'clip-path': `url(#${uid}L)` }),
+        svg('path', { d, class: 'ghost r', 'clip-path': `url(#${uid}R)` }),
+        svg('line', { class: 'axis', x1: f.x0, x2: f.x1, y1: f.base, y2: f.base }),
+        ...LOT_TICKS.flatMap((z) => [
+          svg('line', { class: 'axis', x1: X(z), x2: X(z), y1: f.base, y2: f.base + 4 }),
+          svg('text', { class: 'tk', x: X(z), y: f.base + 18, 'text-anchor': 'middle' }, fmt.money(z, 'USD', 0))]),
+        svg('line', { class: 'you-line', x1: youX, x2: youX, y1: f.top - 8, y2: f.base }),
+        svg('circle', { class: 'you-dot', cx: youX, cy: f.base, r: 4.5 }),
+        svg('text', { class: 'you-t', x: youX, y: f.top - 14, 'text-anchor': youX < 30 ? 'start' : youX > pw - 30 ? 'end' : 'middle' }, t('l.you')));
+    }
+    // Where each light rests. The gold post is the edge between two runs of bins, poorer lives on its left and richer on its right,
+    // so no light ever sits on the wrong side of it. The dots shrink only as far as the tallest stack needs, so a few lives are big
+    // and a few hundred still fit.
+    function layout() {
+      const f = frame(), n = lives.length;
+      const youX = f.x0 + lx(inc.z) * f.wid;
+      const wl = youX - f.x0, wr = f.x1 - youX; // room on the poorer side and on the richer side
+      const rich = lives.map((i) => P.z[i] > inc.z), xs = lives.map((i) => lx(P.z[i]) * f.wid);
+      let r = 9, d = 0, nl = 1, nr = 1, fill = new Uint16Array(2); // the first lives are big; the dots shrink as the pile needs the room
+      const binOf = (k) => (rich[k]
+        ? nl + Math.min(nr - 1, Math.floor(Math.max(0, xs[k] - wl) / (wr / nr || 1)))
+        : Math.min(nl - 1, Math.floor(xs[k] / (wl / nl || 1))));
+      for (; r >= 1.8; r -= 0.3) {
+        d = 2 * r + 0.8;
+        nl = Math.max(1, Math.floor(wl / d)); nr = Math.max(1, Math.floor(wr / d));
+        fill = new Uint16Array(nl + nr);
+        let max = 0;
+        for (let k = 0; k < n; k++) { const b = binOf(k); if (++fill[b] > max) max = fill[b]; }
+        if (max * d <= f.room) break;
+      }
+      fill.fill(0);
+      return lives.map((_, k) => {
+        const b = binOf(k), left = b < nl;
+        const cx = left ? f.x0 + (b + 0.5) * (wl / nl) : youX + (b - nl + 0.5) * (wr / nr);
+        return [left ? Math.min(cx, youX - r) : Math.max(cx, youX + r), f.base - r - 1 - fill[b]++ * d, r];
+      });
+    }
+    function placeDots() {
+      if (!pw) return null;
+      const pos = layout();
+      pos.forEach(([cx, cy, r], k) => { const c = dots[k]; c.setAttribute('cx', cx.toFixed(1)); c.setAttribute('cy', cy.toFixed(1)); c.setAttribute('r', r.toFixed(2)); });
+      return pos;
+    }
+    // a new light falls from above the line onto its place in the pile and settles with a small hop
+    function addDot(i) {
+      const c = svg('circle', { class: 'lot-dot ' + (P.z[i] > inc.z ? 'r' : 'p'), r: 0 });
+      dots.push(c); gDots.appendChild(c);
+      const pos = placeDots();
+      if (pos && smooth()) {
+        c.style.setProperty('--drop', `${-(pos[pos.length - 1][1] + 30)}px`);
+        c.classList.add('new');
+        c.addEventListener('animationend', () => c.classList.remove('new'), { once: true });
+      }
+      return c;
+    }
+    function ring(c) {
+      const r = svg('circle', { class: 'lot-ring', cx: c.getAttribute('cx'), cy: c.getAttribute('cy'), r: 6 });
+      gDots.appendChild(r);
+      r.addEventListener('animationend', () => r.remove(), { once: true });
+    }
+
+    // ----- what the lives add up to
+    function paintCounts(side) {
+      cntP.textContent = fmt.int(nPoorer); cntR.textContent = fmt.int(nRicher);
+      labP.textContent = t(nPoorer === 1 ? 'l.side.poorer.1' : 'l.side.poorer'); labR.textContent = t(nRicher === 1 ? 'l.side.richer.1' : 'l.side.richer');
+      const n = nPoorer + nRicher;
+      splitP.style.transform = `scaleX(${n ? nPoorer / n : 0})`;
+      splitR.style.transform = `scaleX(${n ? nRicher / n : 0})`;
+      const b = side === 'p' ? cntP : side === 'r' ? cntR : null;
+      if (b && smooth()) { b.classList.remove('bump'); void b.offsetWidth; b.classList.add('bump'); }
+    }
+    function paintSay() {
+      const n = lives.length;
+      say.hidden = !n;
+      if (!n) { say.replaceChildren(); return; }
+      const count = mostPoorer ? nPoorer : nRicher;
+      const pct = clamp(Math.round(sideShare * 100), 1, 99);
+      const kids = [el('p', { class: 'lot-lead' }, n === 1 ? t(P.z[lives[0]] > inc.z ? 'l.say.up.1' : 'l.say.1') : t(mostPoorer ? 'l.say' : 'l.say.up', { n: fmt.int(n), count: fmt.int(count) }))]; // one life: the sentence follows that life, not the odds
+      if (n >= 10) kids.push(el('p', { class: 'read lot-odds' }, t(mostPoorer ? 'l.odds' : 'l.odds.up', { pct })));
+      if (n >= 20 && sideShare >= 0.6) kids.push(el('p', { class: 'lot-luck' }, t(mostPoorer ? 'l.luck' : 'l.luck.up')));
+      if (n >= LOT_MAX) kids.push(el('p', { class: 'small' }, t('l.cap')));
+      say.replaceChildren(...kids);
+    }
+    function setBusy(b) {
+      busy = b;
+      const full = lives.length >= LOT_MAX;
+      // aria-disabled, not disabled: the button that was just pressed keeps the keyboard focus while the life is drawn
+      [btn, btn10, btn100, reset].forEach((x) => x.setAttribute('aria-disabled', String(x === reset ? b : b || full)));
+      reset.hidden = !lives.length;
+      card.setAttribute('aria-busy', String(b));
+    }
+
+    // ----- the card: the last life, set against yours
+    const idleCard = () => card.replaceChildren(el('p', { class: 'lot-idle' }, t('l.idle')));
+    function showBusy(text) {
+      card.replaceChildren(el('p', { class: 'lot-busy' }, ui.icon('dice'), el('span', null, text)), el('p', { class: 'lot-flick', 'aria-hidden': 'true' }, ' '));
+    }
+    function startFlick(ms) {
+      if (!ms) return () => {};
+      const id = setInterval(() => { const out = card.querySelector('.lot-flick'); if (out) out.textContent = i18n.countryName(P.country(P.pick())); }, 70);
+      return () => clearInterval(id);
     }
     function showCard(i) {
-      const c = P.country(i), z = P.z[i], richer = z > inc.z;
-      const f = (label, value) => el('div', { class: 'fact' }, el('dt', null, label), el('dd', null, value));
+      const c = P.country(i), z = P.z[i];
+      const hi = Math.max(z, inc.z);
+      const nil = inc.z < 0.05; // no income of your own: a ratio against nothing means nothing, so the card says "much more" instead
+      const ratio = nil ? Infinity : hi / Math.min(z, inc.z);
+      const richer = z > inc.z, same = ratio < 1.15;
+      const x = ratio >= 10 ? fmt.int(Math.round(ratio)) : fmt.dec(ratio, 1);
+      const vsText = same ? t('l.vs.same') : nil ? t('l.vs.nil') : t(richer ? 'l.vs.more' : 'l.vs.less', { x });
+      const vs = el('p', { class: 'lot-vs ' + (same ? 'same' : richer ? 'more' : 'less') }, ...(same ? [vsText] : [ui.icon(richer ? 'plus' : 'minus'), ' ', vsText]));
+      const bars = [[richer ? 'r' : 'p', t('l.bar.this'), z, day(z)], ['you', t('l.bar.you'), inc.z, nil ? fmt.money(0, 'USD', 0) : day(inc.z)]].map(([cls, label, v, text]) => {
+        const fillEl = el('i', { class: cls });
+        fillEl.style.setProperty('--w', '0');
+        fillEl.dataset.w = String(Math.max(0.02, v / hi));
+        return el('div', { class: 'lot-bar' }, el('span', null, label), el('span', { class: 'track' }, fillEl), el('span', { class: 'val' }, text));
+      });
+      const pct = (v) => t('l.pct', { n: fmt.int(Math.round(v)) });
+      const rows = [
+        [t('l.life'), t('l.years', { n: fmt.dec(c.life, 1) }), t('l.years', { n: fmt.dec(home.life, 1) })],
+        [t('l.u5'), t('l.per1000', { n: fmt.int(c.u5) }), t('l.per1000', { n: fmt.int(home.u5) })],
+        [t('l.elec'), pct(c.elec), pct(home.elec)], [t('l.water'), pct(c.water), pct(home.water)], [t('l.net'), pct(c.net), pct(home.net)]];
       card.replaceChildren(
         el('h3', null, t('l.born', { country: i18n.countryName(c) })),
-        el('p', { class: 'lot-income' }, t('l.income', { day: H().day(z) })),
-        el('p', { class: 'lot-vs ' + (richer ? 'up' : 'down') }, ui.icon(richer ? 'check' : 'minus'), ' ', t(richer ? 'l.richer' : 'l.poorer')),
-        el('dl', { class: 'facts' },
-          f(t('l.life'), t('l.years', { n: fmt.dec(c.life, 1) })), f(t('l.u5'), t('l.per1000', { n: fmt.int(c.u5) })),
-          f(t('l.elec'), t('l.pct', { n: fmt.int(Math.round(c.elec)) })), f(t('l.water'), t('l.pct', { n: fmt.int(Math.round(c.water)) })), f(t('l.net'), t('l.pct', { n: fmt.int(Math.round(c.net)) }))));
+        el('p', { class: 'lot-income' }, t('l.income', { day: day(z) })),
+        vs,
+        el('div', { class: 'lot-bars', 'aria-hidden': 'true' }, ...bars),
+        el('table', { class: 'lot-facts' },
+          el('thead', null, el('tr', null, el('th', { scope: 'col' }, el('span', { class: 'sr-only' }, t('l.col.what'))), el('th', { scope: 'col' }, t('l.col.this')), el('th', { scope: 'col' }, i18n.countryName(home)))),
+          el('tbody', null, ...rows.map(([k, a, b]) => el('tr', null, el('th', { scope: 'row' }, k), el('td', { class: 'this' }, a), el('td', null, b))))));
+      void card.offsetWidth; // the bars start empty and grow to their size
+      card.querySelectorAll('.lot-bar i').forEach((b) => b.style.setProperty('--w', b.dataset.w));
+      live.textContent = [t('l.born', { country: i18n.countryName(c) }), t('l.income', { day: day(z) }), vsText].join('. ') + '.';
     }
-    function record(i) { n++; if (P.z[i] > inc.z) better++; paintTally(); showCard(i); }
-    async function spin() {
-      if (busy) return; busy = true; btn.disabled = true;
-      const i = P.pick();
-      if (g3) { const [lon, lat] = g3.dotLonLat(i); await g3.spinTo(lon, lat, { ms: HLIA.util.reducedMotion() ? 0 : 3200, turns: 1 }); }
-      record(i); busy = false; btn.disabled = false;
-    }
-    function spin10() { for (let k = 0; k < 10; k++) record(P.pick()); }
-    const btn = el('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: spin }, ui.icon('dice'), ' ', t('l.spin'));
-    const btn10 = el('button', { type: 'button', class: 'btn btn-ghost', onclick: spin10 }, t('l.spin10'));
-    const reset = el('button', { type: 'button', class: 'btn btn-quiet', onclick() { n = 0; better = 0; paintTally(); card.replaceChildren(el('p', { class: 'small' }, t('l.idle'))); g3 && g3.releasePin(); } }, t('l.reset'));
 
-    // the 3D globe wakes up when the section comes into view
+    // ----- drawing lives
+    function land(i, { single = false, quiet = false } = {}) {
+      lives.push(i);
+      const richer = P.z[i] > inc.z;
+      if (richer) nRicher++; else nPoorer++;
+      const c = addDot(i);
+      paintCounts(quiet ? null : richer ? 'r' : 'p');
+      if (single && smooth()) ring(c);
+      if (!quiet) paintSay();
+    }
+    const rollDice = () => { dice.classList.remove('rolling'); void dice.getBoundingClientRect(); dice.classList.add('rolling'); };
+    // The globe is for show, and it only moves while it is on screen. A life never waits on it for longer than the turn should take.
+    const globeShown = () => { const r = host.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; };
+    async function turnTo(i, ms, turns) {
+      if (!g3) { if (ms) await lotSleep(Math.min(ms, 1000)); return; }
+      const [lon, lat] = g3.dotLonLat(i);
+      const run = (o) => Promise.resolve(g3.spinTo(lon, lat, o));
+      if (ms && !globeShown()) { run({ ms: 0, turns: 0 }).catch(() => {}); await lotSleep(Math.min(ms, 900)); return; } // out of sight: jump, keep a short beat
+      await Promise.race([run({ ms, turns }), lotSleep(ms + 1200)]);
+    }
+    async function spin() {
+      if (busy || lives.length >= LOT_MAX) return;
+      setBusy(true); rollDice();
+      const i = P.pick(), first = !lives.length;
+      const ms = smooth() ? (first ? 2800 : 1500) : 0;
+      showBusy(t('l.drawing'));
+      const stop = startFlick(ms);
+      try { await turnTo(i, ms, first ? 1 : 0); } catch (e) { /* the globe is decoration: the life lands anyway */ } finally { stop(); }
+      land(i, { single: true });
+      showCard(i);
+      setBusy(false);
+    }
+    async function many(k) {
+      if (busy || lives.length >= LOT_MAX) return;
+      k = Math.min(k, LOT_MAX - lives.length);
+      setBusy(true); rollDice();
+      showBusy(k === 1 ? t('l.drawing') : t('l.drawing.many', { k }));
+      const out = card.querySelector('.lot-flick');
+      const gap = smooth() ? clamp(2600 / k, 14, 90) : 0;
+      const picks = Array.from({ length: k }, () => P.pick());
+      const last = picks[k - 1];
+      const turn = turnTo(last, smooth() ? 2400 : 0, 0).catch(() => {}); // the globe turns while the lights fall
+      for (let j = 0; j < k; j++) {
+        land(picks[j], { quiet: true });
+        if (out) out.textContent = i18n.countryName(P.country(picks[j]));
+        if (j % 6 === 5) paintSay();
+        if (gap) await lotSleep(gap);
+      }
+      paintSay();
+      await turn;
+      showCard(last);
+      live.textContent = t(k === 1 ? 'l.live.batch.1' : 'l.live.batch', { k, worse: nPoorer, better: nRicher }); // one line for a screen reader, not one per life
+      setBusy(false);
+    }
+    function clearAll() {
+      if (busy) return;
+      lives.length = 0; nPoorer = 0; nRicher = 0;
+      dots.length = 0; gDots.replaceChildren();
+      paintCounts(null); paintSay(); idleCard(); live.textContent = '';
+      g3 && g3.releasePin();
+      setBusy(false);
+      btn.focus(); // the button that was just pressed is hidden now: focus goes back to the main one
+    }
+
+    // ----- waking up: the globe and the shape of the world come in when the section is seen
+    const measure = () => { pw = plot.clientWidth; ph = plot.clientHeight; };
+    const redraw = () => { measure(); if (!pw) return; svgEl.setAttribute('viewBox', `0 0 ${pw} ${ph}`); buildStatic(); placeDots(); };
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(redraw);
+    if (ro) ro.observe(plot); else setTimeout(redraw, 0);
+    let waking = false, gone = false; // gone: the report was rebuilt while the globe code was still loading
     const io = new IntersectionObserver(async (es) => {
-      if (!es[0].isIntersecting || g3) return;
-      if (!(await R1().load3d())) { host.hidden = true; return; }
+      if (!es[0].isIntersecting || g3 || waking) return;
+      let ok = false;
+      waking = true;
+      try { ok = await R1().load3d(); } finally { waking = false; }
+      if (gone) return;
+      if (!ok) { host.hidden = true; return; }
       try {
         g3 = new HLIA.Globe3D(host, { reduced: HLIA.util.reducedMotion() });
         g3.setUser({ z: inc.z, id: S.a.residence }); g3.setWaveInstant();
-      } catch (e) { if (g3) g3.dispose(); g3 = null; host.hidden = true; } // no WebGL: the card and the tally still work
+      } catch (e) { if (g3) g3.dispose(); g3 = null; host.hidden = true; } // no WebGL: the card, the pile and the counts still work
     }, { threshold: 0.2 });
     io.observe(host);
-    st.disposers = (st.disposers || []).concat(() => { io.disconnect(); if (g3) { g3.dispose(); g3 = null; } });
+    const ioSeen = new IntersectionObserver((es) => { if (es[0].isIntersecting) { svgEl.classList.add('seen'); ioSeen.disconnect(); } }, { threshold: 0.35 });
+    ioSeen.observe(plot);
+    st.disposers = (st.disposers || []).concat(() => { gone = true; io.disconnect(); ioSeen.disconnect(); ro && ro.disconnect(); if (g3) { g3.dispose(); g3 = null; } });
+
+    idleCard(); paintCounts(null); paintSay(); setBusy(false);
 
     // place premium
     const maxX = 15;
@@ -361,8 +605,8 @@
       el('p', { class: 'small' }, t('l.premium.note')));
     const fact = el('p', { class: 'read lot-fact' }, t('l.fact'), ' ', HLIA.results.infoFor(['milanovic']));
     return HLIA.results.section('lottery', 'l.title', null, [
-      el('div', { class: 'lot-grid' }, host, el('div', { class: 'lot-side' }, el('div', { class: 'lot-actions' }, btn, btn10, reset), card, bar, tally)),
-      fact, prem,
+      el('div', { class: 'lot-grid' }, el('div', { class: 'lot-left' }, host, card), el('div', { class: 'lot-right' }, actions, pile, say, note)),
+      live, fact, prem,
     ], { introKey: 'l.body', wide: true });
   }
 

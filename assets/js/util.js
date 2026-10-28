@@ -107,8 +107,12 @@
       return nf({ maximumSignificantDigits: 2 }).format(n);
     },
     compact: (n) => nf({ notation: 'compact', maximumFractionDigits: n >= 1e9 ? 1 : n >= 1e6 ? 1 : 0 }).format(n),
-    // people counts: "7.4 billion", "840 million" (translated by the caller)
-    money: (n, cur = 'USD', digits = 0) => nf({ style: 'currency', currency: cur, maximumFractionDigits: digits, minimumFractionDigits: digits, currencyDisplay: 'narrowSymbol' }).format(n),
+    // Dollars read "US$ 9,91" in Spanish, the symbol first as in the copy, because a bare "$" is the peso in much of Latin America.
+    // The space is a non-breaking one, so the symbol never ends a line alone. Every other currency keeps its own symbol.
+    money: (n, cur = 'USD', digits = 0) => {
+      if (cur === 'USD' && /^es/.test(locale)) return (n < 0 ? '-' : '') + 'US$\u00A0' + nf({ minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Math.abs(n));
+      return nf({ style: 'currency', currency: cur, maximumFractionDigits: digits, minimumFractionDigits: digits, currencyDisplay: 'narrowSymbol' }).format(n);
+    },
   };
   // "Top X%" label for a share of people who are ahead of you (0..1).
   function topLabel(share) {

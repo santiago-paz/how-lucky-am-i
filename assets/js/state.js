@@ -23,11 +23,12 @@
     view: 'intro', // intro | wizard | results
     basicsTouched: false,
     passportsTouched: false,
+    residenceTouched: false, // the visitor picked the country from the list, so it is not only the browser's guess
 
-    reset() { Object.assign(this, { a: blank(), step: 1, maxStep: 1, view: 'intro', basicsTouched: false, passportsTouched: false }); this.save(); },
+    reset() { Object.assign(this, { a: blank(), step: 1, maxStep: 1, view: 'intro', basicsTouched: false, passportsTouched: false, residenceTouched: false }); this.save(); },
     save() {
       try {
-        sessionStorage.setItem(KEY, JSON.stringify({ a: this.a, step: this.step, maxStep: this.maxStep, view: this.view, basicsTouched: this.basicsTouched, passportsTouched: this.passportsTouched }));
+        sessionStorage.setItem(KEY, JSON.stringify({ a: this.a, step: this.step, maxStep: this.maxStep, view: this.view, basicsTouched: this.basicsTouched, passportsTouched: this.passportsTouched, residenceTouched: this.residenceTouched }));
       } catch (e) { /* storage can be blocked */ }
     },
     load() {
@@ -37,7 +38,7 @@
         const d = JSON.parse(raw);
         this.a = Object.assign(blank(), d.a);
         this.step = d.step || 1; this.maxStep = d.maxStep || 1; this.view = d.view || 'intro';
-        this.basicsTouched = !!d.basicsTouched; this.passportsTouched = !!d.passportsTouched;
+        this.basicsTouched = !!d.basicsTouched; this.passportsTouched = !!d.passportsTouched; this.residenceTouched = !!d.residenceTouched;
         // a saved country that no longer exists would break the model
         if (this.a.residence && !model.byId[this.a.residence]) this.a.residence = null;
         return true;
@@ -60,7 +61,8 @@
     ready() {
       const a = this.a, out = [];
       if (a.residence && a.passports.length) out.push('mobility', 'stability');
-      if (a.residence && a.income.amount != null && a.income.amount > 0) out.push('income');
+      // a shared household counts by its total, which the model divides by the number of people
+      if (a.residence && ((a.income.amount != null && a.income.amount > 0) || (a.household.shared && a.household.total > 0))) out.push('income');
       if (a.tenure && a.savings) out.push('wealth');
       if (this.basicsTouched) out.push('basics');
       if (a.education) out.push('education');
@@ -68,6 +70,12 @@
       if (a.workType && a.support != null && a.stateHelp && a.savings) out.push('safety');
       return out;
     },
+    // The live panel shows a place only once income is in. Before that the place would rest on the country and the
+    // passports alone. Someone with no income of their own has no amount to wait for, so passing the money step counts too.
+    placed() { return this.ready().includes('income') || this.maxStep >= 3; },
+    // True while the country on screen is only the browser's guess and the visitor has not looked at it yet.
+    // Nothing in the panel may rest on it.
+    guessing() { return this.maxStep < 2 && !this.passportsTouched && !this.residenceTouched && !!this.a.residence && this.guessCountry() === this.a.residence; },
     // Answers with neutral stand-ins for anything not answered yet (those areas are not counted).
     forModel() {
       const a = JSON.parse(JSON.stringify(this.a));

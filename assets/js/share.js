@@ -1,5 +1,7 @@
-/* The share card: drawn on a canvas, downloadable, shareable. It shows only the overall place.
-   Income, savings and other answers never go on it. */
+/* The share card: drawn on a canvas, downloadable, shareable. It shows the overall place and, with the bars on, the
+   place in each area. Income, savings and other answers never go on it, and the country only if the person turns it on.
+   When the visitor, or their country's typical person, is in the lower half it says "ahead of 32%", not "top 68%"
+   (HLIA.results.frameAhead). */
 (function (global) {
   'use strict';
   const HLIA = global.HLIA;
@@ -70,14 +72,22 @@
       ctx.font = `600 ${c.size}px ${F}`; ctx.fillStyle = ink2; ctx.textAlign = 'right'; ctx.fillText(c.text, RIGHT, LAY.wordmark); ctx.textAlign = 'left';
     }
 
-    // the number: "Top", the figure and the percent sign all stand on one baseline
-    const top = HLIA.util.topLabel(R.overall.ahead);
-    ctx.font = `650 64px ${F}`; const topW = ctx.measureText('Top').width;
-    ctx.fillStyle = ink2; ctx.fillText('Top', M, LAY.number);
-    const numX = M + topW + 28;
-    ctx.font = `800 300px ${F}`; ctx.fillStyle = ink; ctx.fillText(top, numX, LAY.number);
-    const numW = ctx.measureText(top).width;
-    ctx.font = `700 150px ${F}`; ctx.fillStyle = ink2; ctx.fillText('%', numX + numW + 12, LAY.number);
+    // the number: a small word ("Top" or "Ahead of"), the figure and the percent sign all stand on one baseline
+    const ahead = HLIA.results.frameAhead(R);
+    const fig = ahead ? HLIA.results.pctSmart(R.overall.pct) : HLIA.util.topLabel(R.overall.ahead);
+    const word = ahead ? t('s.card.ahead') : 'Top';
+    // the word gets the room the figure leaves, so a long word (in Spanish) shrinks; a very long figure shrinks a little first
+    let figSize = 300;
+    const figBox = () => { ctx.font = `800 ${figSize}px ${F}`; const fw = ctx.measureText(fig).width; ctx.font = `700 ${figSize / 2}px ${F}`; return { fw, pw: ctx.measureText('%').width }; };
+    let box = figBox();
+    ctx.font = `650 36px ${F}`; const wordMin = ctx.measureText(word).width;
+    while (figSize > 200 && wordMin + 28 + box.fw + 12 + box.pw > RIGHT - M) { figSize -= 10; box = figBox(); }
+    const wd = fitText(ctx, word, 650, 64, 36, RIGHT - M - 28 - box.fw - 12 - box.pw, F);
+    ctx.font = `650 ${wd.size}px ${F}`; const wordW = ctx.measureText(wd.text).width;
+    ctx.fillStyle = ink2; ctx.fillText(wd.text, M, LAY.number);
+    const numX = M + wordW + 28;
+    ctx.font = `800 ${figSize}px ${F}`; ctx.fillStyle = ink; ctx.fillText(fig, numX, LAY.number);
+    ctx.font = `700 ${figSize / 2}px ${F}`; ctx.fillStyle = ink2; ctx.fillText('%', numX + box.fw + 12, LAY.number);
     ctx.font = `500 46px ${F}`; ctx.fillStyle = ink; ctx.fillText(t('s.card.of', { pop: i18n.people(HLIA.DATA.meta.pipPop) }), M, LAY.caption);
 
     // the crowd, sorted by income, with you in gold. With the eight bars on, the crowd is a band; without them it fills the card.
@@ -121,7 +131,7 @@
     if (opts.areas) {
       const FS = 30, gap = LAY.rowPitch, y0 = base + LAY.barsGap + LAY.rowThick / 2 + 8, thick = LAY.rowThick;
       const names = R.dims.map((dim) => t('dim.' + dim.id));
-      const vals = R.dims.map((dim) => t('a.top', { pct: HLIA.util.topLabel(1 - dim.global) }));
+      const vals = R.dims.map((dim) => (ahead ? t('a.ahead', { pct: HLIA.results.pctSmart(dim.global) }) : t('a.top', { pct: HLIA.util.topLabel(1 - dim.global) })));
       // the longest area name (it is longer in Spanish) must fit left of the bars; the bars start right after the widest name
       const nameMax = 360;
       let fs = FS;
@@ -153,7 +163,9 @@
 
   function section(R) {
     const opts = { country: false, areas: true };
-    const canvas = el('canvas', { class: 'share-canvas', role: 'img', 'aria-label': t('s.alt', { pct: HLIA.util.topLabel(R.overall.ahead) }) });
+    const ahead = HLIA.results.frameAhead(R);
+    const pctText = ahead ? HLIA.results.pctSmart(R.overall.pct) : HLIA.util.topLabel(R.overall.ahead);
+    const canvas = el('canvas', { class: 'share-canvas', role: 'img', 'aria-label': t(ahead ? 's.alt.ahead' : 's.alt', { pct: pctText }) });
     const render = async () => { try { await document.fonts.load('800 100px "Mona Sans"'); await document.fonts.load('650 40px "Mona Sans"'); } catch (e) { /* use fallback */ } draw(canvas, R, opts); };
     const sw = (key, labelKey) => {
       const id = 'sh-' + key;
@@ -161,7 +173,7 @@
       input.addEventListener('change', () => { opts[key] = input.checked; render(); });
       return el('label', { class: 'switch', for: id }, input, el('span', { class: 'track', 'aria-hidden': 'true' }), el('span', { class: 'switch-text' }, t(labelKey)));
     };
-    const text = t('s.text', { pct: HLIA.util.topLabel(R.overall.ahead), pop: i18n.people(HLIA.DATA.meta.pipPop) });
+    const text = t(ahead ? 's.text.ahead' : 's.text', { pct: pctText, pop: i18n.people(HLIA.DATA.meta.pipPop) });
     const blob = () => new Promise((res) => canvas.toBlob(res, 'image/png'));
     const copy = el('button', { type: 'button', class: 'btn btn-ghost', onclick: async () => { try { await navigator.clipboard.writeText(text + ' ' + publicOrigin()); copy.textContent = t('s.copied'); setTimeout(() => { copy.textContent = t('s.copy'); }, 1600); } catch (e) { /* clipboard blocked */ } } }, t('s.copy'));
     const save = async () => { const b = await blob(); const a = el('a', { href: URL.createObjectURL(b), download: 'how-lucky-am-i.png' }); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000); };
@@ -178,11 +190,16 @@
     render();
     const sparkle = el('span', { class: 'fx-sparkles', 'aria-hidden': 'true' });
     if (HLIA.fx) HLIA.fx.sparkles(sparkle);
+    // the card and its buttons come first, so on a phone they fit on one screen; the note comes before the two switches
+    // because it describes them
     const sec = HLIA.results.section('share', 's.title', null, [
       el('div', { class: 'share-grid' },
         el('div', { class: 'share-preview' }, el('div', { class: 'share-sheet' }, canvas, sparkle)),
-        el('div', { class: 'share-side' }, sw('country', 's.country'), sw('areas', 's.areas'), el('div', { class: 'share-actions' }, shareBtn, dl, copy))),
-    ], { introKey: 's.body', wide: true });
+        el('div', { class: 'share-side' },
+          el('div', { class: 'share-actions' }, shareBtn, dl, copy),
+          el('p', { class: 'read share-note' }, t('s.body')),
+          el('div', { class: 'share-opts' }, sw('country', 's.country'), sw('areas', 's.areas')))),
+    ], { wide: true });
     return sec;
   }
 

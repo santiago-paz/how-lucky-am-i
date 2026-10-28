@@ -37,6 +37,11 @@
   .field { display: grid; gap: 0.5rem; align-content: start; }
   .field-label, .field > label { font-weight: 650; font-size: var(--t-base); color: var(--ink); line-height: 1.3; }
   .hint { color: var(--ink-3); font-size: var(--t-sm); line-height: 1.45; }
+  /* the note under a personal question: a lock, then one line, close under the hint above it */
+  .hint-private { display: flex; align-items: flex-start; gap: 0.45rem; }
+  .hint-private svg { flex: none; width: 1.1em; height: 1.1em; margin-top: 0.17em; color: var(--ink-2); }
+  .hint-private .sent { display: inline-block; max-width: 100%; }
+  .hint + .hint-private { margin-top: -0.2rem; }
   .input {
     width: 100%; min-height: 3rem; padding: 0.7rem 1rem;
     background: var(--surface-2); border: 1px solid var(--line-2); border-radius: var(--r-m);
@@ -150,12 +155,25 @@
     transition: background-color var(--t-fast) var(--ease), color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease);
   }
   .info:hover, .info[aria-expanded="true"] { background: var(--accent-wash); color: var(--accent); border-color: var(--accent); }
+  /* on a touch screen the dot answers a tap from 44px around it; its look and its place do not change */
+  @media (max-width: 760px), (pointer: coarse) {
+    .info { position: relative; }
+    .info::after { content: ""; position: absolute; inset: -0.6rem; }
+    /* the same for the segmented control (the language switch, the view switches) and the quiet buttons */
+    .seg button, .btn-quiet { position: relative; }
+    .seg button::after { content: ""; position: absolute; inset: -5.5px 0; }
+    .btn-quiet::after { content: ""; position: absolute; inset: -2px; }
+    .chip button { position: relative; }
+    .chip button::after { content: ""; position: absolute; inset: -0.65rem; }
+    .range { height: 2.75rem; } /* the track stays 6px and centred: the slider answers a tap 44px tall */
+  }
   .info-pop {
     position: absolute; z-index: 90; top: calc(100% + 8px); right: 0; width: min(22rem, 86vw);
     padding: 1rem 1.1rem; background: var(--surface-3); border: 1px solid var(--line-2); border-radius: var(--r-m);
     box-shadow: 0 20px 44px rgba(2, 4, 16, 0.55); font-size: var(--t-sm); line-height: 1.5; color: var(--ink-2); text-align: left;
   }
-  .info-pop h4 { font-size: var(--t-base); color: var(--ink); margin-bottom: 0.4rem; letter-spacing: -0.01em; }
+  .info-pop.up { top: auto; bottom: calc(100% + 8px); box-shadow: 0 -12px 36px rgba(2, 4, 16, 0.55); }
+  .info-pop .pop-title { font-size: var(--t-base); font-weight: 700; line-height: 1.2; text-wrap: balance; color: var(--ink); margin-bottom: 0.4rem; letter-spacing: -0.01em; }
   .info-pop dl { display: grid; gap: 0.5rem; margin-top: 0.6rem; }
   .info-pop dt { color: var(--ink-3); font-size: var(--t-xs); }
   .info-pop dd { margin: 0; color: var(--ink); }

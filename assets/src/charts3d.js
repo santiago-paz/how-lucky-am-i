@@ -502,8 +502,8 @@ export class Towers3D extends Stage3D {
       const tower = { g, body3, bodyMat, edgeMat: edges.material, cap, capGlow, typ, h, th, hover: 0, x, x0: x, z: 0, index: i };
       // labels: the value above the tower, the name with its icon on the floor in front
       tower.valEl = el('div', { class: 'c3-val' }, a.text);
-      // on a narrow frame the value moves down under the icon (the name is dropped), so nothing crowds the tops of the towers
-      tower.nameEl = el('div', { class: 'c3-name' }, el('span', { class: 'c3-ico' }, a.icon ? a.icon.cloneNode(true) : null), el('span', { class: 'c3-nm' }, a.name), el('b', { class: 'c3-nv' }, a.text));
+      // on a narrow frame the label is a stack on the floor (the icon, a one-word name, the value), so nothing crowds the tops of the towers
+      tower.nameEl = el('div', { class: 'c3-name' }, el('span', { class: 'c3-ico' }, a.icon ? a.icon.cloneNode(true) : null), el('span', { class: 'c3-nm' }, a.name), el('span', { class: 'c3-ns' }, a.short || a.name), el('b', { class: 'c3-nv' }, a.text));
       this.labelHost.append(tower.valEl, tower.nameEl);
       this.towers.push(tower);
     });
@@ -554,15 +554,18 @@ export class Towers3D extends Stage3D {
     const aspect = this.camera.aspect;
     this.narrow = this.w < 600;
     this.container.classList.toggle('c3-narrow', this.narrow);
-    const k = this.narrow ? clamp(aspect / 1.45, 0.64, 1) : 1;
+    const lower = this.narrow ? 0.4 : 0; // the key takes a row at the top of a narrow frame: the scene sits a little lower
+    const room = this.narrow ? 2.2 : 1.2; // room under the towers for a second row of names (on a narrow frame the label is taller: icon, name and value)
+    const extentY = TW.HMAX + 4.4 + lower * 2 + room;
+    // Closer only as far as the frame's height needs: past that the picture cannot grow, so the spare width goes to the
+    // gaps, and each label has room beside the next one.
+    const k = this.narrow ? clamp((aspect * extentY - (TW.W + 1.4)) / this.rowW, 0.64, 1) : 1;
     this.k = k;
     this.towers.forEach((T) => { T.x = T.x0 * k; T.g.position.x = T.x; T.valW = 0; T.nameW = 0; }); // the label sizes are measured again on the next frame
     this.wallG.scale.x = k;
-    const lower = this.narrow ? 0.4 : 0; // the key takes a row at the top of a narrow frame: the scene sits a little lower
-    const room = this.narrow ? 1.7 : 1.2; // room under the towers for a second row of names (and, on a narrow frame, of values)
     this.target.set(0, TW.HMAX * 0.5 - 0.1 + lower - room / 2, -0.3);
     const extentX = this.narrow ? this.rowW * k + TW.W + 1.4 : (this.wallX[1] - this.wallX[0]) + 0.3;
-    this.dist = this.fitDistance(extentX, TW.HMAX + 4.4 + lower * 2 + room, 1.02);
+    this.dist = this.fitDistance(extentX, extentY, 1.02);
   }
 
   // a point inside tower i, in pixels from the top left of the chart
@@ -630,7 +633,7 @@ export class Towers3D extends Stage3D {
     const floor = this.towers.map((T) => {
       if (!T.nameW) {
         // the width of the words as drawn (a wrapped box is as wide as its limit, which would count gaps as collisions)
-        const range = document.createRange(); range.selectNodeContents(this.narrow ? T.nameEl.lastElementChild : T.nameEl.children[1]);
+        const range = document.createRange(); range.selectNodeContents(this.narrow ? T.nameEl : T.nameEl.children[1]);
         T.nameW = Math.max(18, range.getBoundingClientRect().width, T.nameEl.firstElementChild ? T.nameEl.firstElementChild.offsetWidth : 0);
         T.nameH = T.nameEl.offsetHeight;
       }
@@ -663,7 +666,9 @@ export class Towers3D extends Stage3D {
     // your place overall: at the right end of the gold line
     const O = this.overall, os = reduced ? 1 : clamp((A - 1.8) / 0.5, 0, 1);
     const right = this.toScreen(O.xe * this.k + 0.14, O.g.position.y, TW.WALLZ);
-    this.overallEl.style.transform = this.narrow ? `translate(${right.x}px, ${right.y}px) translate(-100%, -128%)` : `translate(${right.x}px, ${right.y}px) translate(0, -50%)`;
+    // on a narrow frame the label ends at the end of the line, but never past the frame, so its last letters are not cut off
+    const rx = this.narrow ? Math.min(right.x, this.w - 10) : right.x;
+    this.overallEl.style.transform = this.narrow ? `translate(${rx}px, ${right.y}px) translate(-100%, -128%)` : `translate(${right.x}px, ${right.y}px) translate(0, -50%)`;
     this.overallEl.style.opacity = String(os);
   }
 }

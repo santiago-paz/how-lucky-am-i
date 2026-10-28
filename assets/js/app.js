@@ -54,13 +54,17 @@
     S.save();
     if (v === 'intro' && hero) hero.render();
   }
+  // Each move below replaces the page the visitor was on, and the button they pressed goes with it. Focus follows
+  // them to the new heading, so a keyboard or screen reader user is not left at the top of a page they have left.
   function start() {
     setView('wizard');
-    HLIA.wizard.open();
+    HLIA.wizard.open({ focus: true });
   }
-  function reveal() {
+  async function reveal() {
     setView('results');
-    if (HLIA.results) HLIA.results.show();
+    if (!HLIA.results) return;
+    await HLIA.results.show();
+    HLIA.results.handOff();
   }
   function restart() {
     if (S.maxStep > 1 || S.view === 'results') {
@@ -71,11 +75,14 @@
     if (g) { S.a.residence = g; S.a.passports = [g]; }
     HLIA.wizard.render();
     setView('intro');
+    $('#intro-title').focus({ preventScroll: true });
   }
 
   function viewFromHash() {
     const m = /^#\/(wizard|results)$/.exec(location.hash);
-    return m ? m[1] : 'intro';
+    if (m) return m[1];
+    // an in-page link (a nav tab) is not a route: a reload keeps the view the visit was in
+    return location.hash && S.view === 'results' ? 'results' : 'intro';
   }
   function canShowResults() {
     return !!(S.a.residence && S.a.passports.length && S.a.education && S.a.health && S.a.tenure);
@@ -114,10 +121,17 @@
     $$('[data-lang]').forEach((b) => b.addEventListener('click', () => { i18n.setLang(b.dataset.lang); }));
     HLIA.bus.on('lang', () => { paintIntro(); paintLang(); paintFooter(); });
     global.addEventListener('popstate', () => {
+      // an in-page link (a nav tab, "skip to the content") is not a change of view: the browser scrolls and the page stays
+      if (location.hash && !/^#\/(wizard|results)$/.test(location.hash)) return;
       const v = viewFromHash();
-      setView(v === 'results' && !canShowResults() ? 'wizard' : v, { push: false });
-      if (S.view === 'wizard') HLIA.wizard.open();
-      if (S.view === 'results' && HLIA.results) HLIA.results.show();
+      const target = v === 'results' && !canShowResults() ? 'wizard' : v;
+      // Back from a section link lands on the same report that is already on screen: the browser restores the scroll, nothing is rebuilt
+      if (target === S.view) return;
+      setView(target, { push: false });
+      // Back and Forward replace the page like a button does, so focus follows to the new heading here too
+      if (S.view === 'intro') $('#intro-title').focus({ preventScroll: true });
+      if (S.view === 'wizard') HLIA.wizard.open({ focus: true });
+      if (S.view === 'results' && HLIA.results) HLIA.results.show().then(HLIA.results.handOff);
     });
 
     // first view: where the visit left off, or the intro
